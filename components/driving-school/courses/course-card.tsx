@@ -15,6 +15,7 @@ export interface Course {
   icon: React.ComponentType<any>;
   color: string;
   recommended?: boolean;
+  studentCount?: number;
 }
 
 interface CourseCardProps {
@@ -67,6 +68,15 @@ export default function CourseCard({ course, onViewDetails }: CourseCardProps) {
           </div>
           <div className="font-bold text-lg text-primary">£{course.price}</div>
         </div>
+        
+        {course.studentCount !== undefined && (
+          <div className="flex items-center justify-center gap-2 text-sm bg-blue-50 dark:bg-blue-900/20 rounded-md py-2">
+            <Users className="w-4 h-4 text-blue-600" />
+            <span className="text-blue-800 dark:text-blue-200">
+              {course.studentCount} students enrolled
+            </span>
+          </div>
+        )}
         
         <div className="space-y-2">
           <h4 className="font-medium text-sm">What you'll learn:</h4>

@@ -89,7 +89,9 @@ Please contact me to arrange the booking. Thank you!`;
                   <Users className="w-4 h-4 text-blue-600" />
                   <span className="text-sm font-medium text-gray-700">Students</span>
                 </div>
-                <div className="text-2xl font-bold text-blue-600">{courseStats.studentsPurchased}</div>
+                <div className="text-2xl font-bold text-blue-600">
+                  {course.studentCount !== undefined ? course.studentCount : courseStats.studentsPurchased}
+                </div>
                 <div className="text-xs text-gray-600">enrolled</div>
               </div>
               

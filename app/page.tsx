@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import HeroSection from '@/components/driving-school/landing/hero-section';
 import UKLicenseProcessEnhanced from '@/components/driving-school/process/uk-license-process-enhanced';
 import CourseCard from '@/components/driving-school/courses/course-card';
@@ -14,12 +14,11 @@ import ScrollToTop from '@/components/scroll-to-top';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { drivingCourses } from '@/lib/data/courses';
 import { drivingInstructors, getInstructorsByFilters } from '@/lib/data/instructors';
 import { Course } from '@/components/driving-school/courses/course-card';
 import { Instructor } from '@/components/driving-school/instructors/instructor-card';
 import { useExitIntent } from '@/hooks/use-exit-intent';
-import { ArrowRight, Star, Users, CheckCircle, Play, Phone, Calendar, MessageCircle, Bell } from 'lucide-react';
+import { ArrowRight, Star, Users, CheckCircle, Play, Phone, Calendar, MessageCircle, Bell, BookOpen } from 'lucide-react';
 
 export default function HomePage() {
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
@@ -27,6 +26,9 @@ export default function HomePage() {
   const [isExitIntentPopupOpen, setIsExitIntentPopupOpen] = useState(false);
   const [showWhatsAppOnExit, setShowWhatsAppOnExit] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [coursesLoading, setCoursesLoading] = useState(true);
+  const [lastCourseUpdate, setLastCourseUpdate] = useState<Date | null>(null);
   const [instructorFilters, setInstructorFilters] = useState({
     location: '',
     transmission: '',
@@ -36,6 +38,39 @@ export default function HomePage() {
     gender: ''
   });
   const [filteredInstructors, setFilteredInstructors] = useState<Instructor[]>(drivingInstructors.slice(0, 6));
+
+  // Fetch courses from API with real-time updates
+  useEffect(() => {
+    const fetchCourses = async () => {
+      try {
+        const response = await fetch('/api/courses');
+        if (response.ok) {
+          const data = await response.json();
+          setCourses(data.courses);
+          setLastCourseUpdate(new Date());
+        }
+      } catch (error) {
+        console.error('Failed to fetch courses:', error);
+        // Fallback to empty array if API fails
+        setCourses([]);
+      } finally {
+        setCoursesLoading(false);
+      }
+    };
+
+    // Initial fetch
+    fetchCourses();
+
+    // Set up periodic refresh every 30 seconds for real-time updates
+    const interval = setInterval(() => {
+      if (!coursesLoading) {
+        fetchCourses();
+      }
+    }, 30000);
+
+    // Cleanup interval on component unmount
+    return () => clearInterval(interval);
+  }, [coursesLoading]);
 
   // Exit intent detection
   useExitIntent({
@@ -126,15 +161,33 @@ export default function HomePage() {
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {drivingCourses.map((course) => (
-              <CourseCard 
-                key={course.id} 
-                course={course} 
-                onViewDetails={handleCourseViewDetails}
-              />
-            ))}
-          </div>
+          {coursesLoading ? (
+            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="animate-pulse">
+                  <div className="bg-gray-200 rounded-lg h-80"></div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+              {courses.map((course) => (
+                <CourseCard 
+                  key={course.id} 
+                  course={course} 
+                  onViewDetails={handleCourseViewDetails}
+                />
+              ))}
+            </div>
+          )}
+          
+          {!coursesLoading && courses.length === 0 && (
+            <div className="text-center py-12">
+              <BookOpen className="w-16 h-16 mx-auto mb-4 text-gray-400" />
+              <h3 className="text-xl font-semibold mb-2">No courses available</h3>
+              <p className="text-gray-600">Courses are being updated. Please check back soon.</p>
+            </div>
+          )}
         </div>
       </section>
 
