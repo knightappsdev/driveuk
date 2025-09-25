@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db/drizzle';
-import { courses, type NewCourse } from '@/lib/db/schema';
+import { courses, bookings, students, users, type NewCourse } from '@/lib/db/schema';
 import { validateApiAccess } from '@/lib/auth/auth-helpers';
-import { desc, eq } from 'drizzle-orm';
+import { desc, eq, count, and, isNull } from 'drizzle-orm';
 import { z } from 'zod';
 
 // Validation schemas
@@ -42,13 +42,34 @@ export async function GET() {
       );
     }
 
-    // Fetch all courses
-    const allCourses = await db
-      .select()
+    // Fetch all courses with student counts
+    const coursesWithCounts = await db
+      .select({
+        id: courses.id,
+        title: courses.title,
+        description: courses.description,
+        level: courses.level,
+        totalHours: courses.totalHours,
+        price: courses.price,
+        features: courses.features,
+        color: courses.color,
+        isRecommended: courses.isRecommended,
+        isActive: courses.isActive,
+        createdAt: courses.createdAt,
+        updatedAt: courses.updatedAt,
+        studentCount: count(bookings.id),
+      })
       .from(courses)
+      .leftJoin(bookings, eq(courses.id, bookings.courseId))
+      .leftJoin(students, eq(bookings.studentId, students.id))
+      .leftJoin(users, eq(students.userId, users.id))
+      .where(and(
+        isNull(users.deletedAt)
+      ))
+      .groupBy(courses.id)
       .orderBy(desc(courses.createdAt));
 
-    return NextResponse.json(allCourses);
+    return NextResponse.json(coursesWithCounts);
 
   } catch (error) {
     console.error('Admin courses fetch error:', error);

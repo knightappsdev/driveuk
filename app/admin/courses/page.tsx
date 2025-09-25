@@ -34,6 +34,11 @@ import {
   TableRow,
 } from '@/components/ui/table';
 
+// Import modal components
+import CourseDetailsModal from '@/components/admin/courses/course-details-modal';
+import CourseEditModal from '@/components/admin/courses/course-edit-modal';
+import CourseCreateModal from '@/components/admin/courses/course-create-modal';
+
 interface Course {
   id: number;
   title: string;
@@ -47,6 +52,7 @@ interface Course {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  studentCount: number;
 }
 
 const levelColors = {
@@ -69,6 +75,12 @@ export default function AdminCoursesPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedLevel, setSelectedLevel] = useState<string>('all');
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
+  
+  // Modal states
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+  const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
 
   useEffect(() => {
     fetchCourses();
@@ -159,6 +171,25 @@ export default function AdminCoursesPage() {
     }
   };
 
+  // Modal handlers
+  const handleViewCourse = (course: Course) => {
+    setSelectedCourse(course);
+    setIsDetailsModalOpen(true);
+  };
+
+  const handleEditCourse = (course: Course) => {
+    setSelectedCourse(course);
+    setIsEditModalOpen(true);
+  };
+
+  const handleCourseCreated = () => {
+    fetchCourses();
+  };
+
+  const handleCourseUpdated = () => {
+    fetchCourses();
+  };
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -194,6 +225,14 @@ export default function AdminCoursesPage() {
         <div className="flex items-center gap-2">
           <Button 
             variant="outline" 
+            onClick={() => window.open('/', '_blank')}
+            className="flex items-center gap-2"
+          >
+            <Eye className="h-4 w-4" />
+            View Public Site
+          </Button>
+          <Button 
+            variant="outline" 
             onClick={fetchCourses}
             disabled={loading}
             className="flex items-center gap-2"
@@ -201,7 +240,10 @@ export default function AdminCoursesPage() {
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
-          <Button className="flex items-center gap-2">
+          <Button 
+            onClick={() => setIsCreateModalOpen(true)}
+            className="flex items-center gap-2"
+          >
             <Plus className="h-4 w-4" />
             Add Course
           </Button>
@@ -326,9 +368,9 @@ export default function AdminCoursesPage() {
                   <TableHead>Course</TableHead>
                   <TableHead>Level</TableHead>
                   <TableHead>Duration & Price</TableHead>
+                  <TableHead>Students</TableHead>
                   <TableHead>Features</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Created</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -360,6 +402,19 @@ export default function AdminCoursesPage() {
                           <DollarSign className="w-3 h-3 mr-1" />
                           £{course.price}
                         </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-center">
+                        <div className="text-lg font-bold text-blue-600">
+                          {course.studentCount}
+                        </div>
+                        <div className="text-xs text-gray-500">Students</div>
+                        {course.studentCount > 0 && (
+                          <div className="text-xs text-green-600 mt-1">
+                            £{(parseFloat(course.price) * course.studentCount).toLocaleString()} revenue
+                          </div>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell>
@@ -402,11 +457,17 @@ export default function AdminCoursesPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem className="cursor-pointer">
+                          <DropdownMenuItem 
+                            className="cursor-pointer"
+                            onClick={() => handleViewCourse(course)}
+                          >
                             <Eye className="mr-2 h-4 w-4" />
                             View Details
                           </DropdownMenuItem>
-                          <DropdownMenuItem className="cursor-pointer">
+                          <DropdownMenuItem 
+                            className="cursor-pointer"
+                            onClick={() => handleEditCourse(course)}
+                          >
                             <Edit className="mr-2 h-4 w-4" />
                             Edit Course
                           </DropdownMenuItem>
@@ -446,6 +507,26 @@ export default function AdminCoursesPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Modals */}
+      <CourseCreateModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onCourseCreated={handleCourseCreated}
+      />
+
+      <CourseEditModal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        onCourseUpdated={handleCourseUpdated}
+        course={selectedCourse}
+      />
+
+      <CourseDetailsModal
+        isOpen={isDetailsModalOpen}
+        onClose={() => setIsDetailsModalOpen(false)}
+        course={selectedCourse}
+      />
     </div>
   );
 }
