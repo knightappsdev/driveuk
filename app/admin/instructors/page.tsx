@@ -37,6 +37,11 @@ import {
   TableRow,
 } from '@/components/ui/table';
 
+// Import modal components
+import InstructorDetailsModal from '@/components/admin/instructors/instructor-details-modal';
+import InstructorEditModal from '@/components/admin/instructors/instructor-edit-modal';
+import InstructorCreateModal from '@/components/admin/instructors/instructor-create-modal';
+
 interface Instructor {
   id: number;
   userId: number;
@@ -75,6 +80,12 @@ export default function AdminInstructorsPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
+  
+  // Modal states
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+  const [selectedInstructor, setSelectedInstructor] = useState<Instructor | null>(null);
 
   useEffect(() => {
     fetchInstructors();
@@ -148,6 +159,25 @@ export default function AdminInstructorsPage() {
     }
   };
 
+  // Modal handlers
+  const handleViewInstructor = (instructor: Instructor) => {
+    setSelectedInstructor(instructor);
+    setIsDetailsModalOpen(true);
+  };
+
+  const handleEditInstructor = (instructor: Instructor) => {
+    setSelectedInstructor(instructor);
+    setIsEditModalOpen(true);
+  };
+
+  const handleInstructorCreated = () => {
+    fetchInstructors();
+  };
+
+  const handleInstructorUpdated = () => {
+    fetchInstructors();
+  };
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -190,7 +220,10 @@ export default function AdminInstructorsPage() {
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
-          <Button className="flex items-center gap-2">
+          <Button 
+            onClick={() => setIsCreateModalOpen(true)}
+            className="flex items-center gap-2"
+          >
             <UserPlus className="h-4 w-4" />
             Add Instructor
           </Button>
@@ -409,11 +442,17 @@ export default function AdminInstructorsPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem className="cursor-pointer">
+                          <DropdownMenuItem 
+                            className="cursor-pointer"
+                            onClick={() => handleViewInstructor(instructor)}
+                          >
                             <Eye className="mr-2 h-4 w-4" />
                             View Details
                           </DropdownMenuItem>
-                          <DropdownMenuItem className="cursor-pointer">
+                          <DropdownMenuItem 
+                            className="cursor-pointer"
+                            onClick={() => handleEditInstructor(instructor)}
+                          >
                             <Edit className="mr-2 h-4 w-4" />
                             Edit Instructor
                           </DropdownMenuItem>
@@ -456,6 +495,26 @@ export default function AdminInstructorsPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Modals */}
+      <InstructorCreateModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onInstructorCreated={handleInstructorCreated}
+      />
+
+      <InstructorEditModal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        onInstructorUpdated={handleInstructorUpdated}
+        instructor={selectedInstructor}
+      />
+
+      <InstructorDetailsModal
+        isOpen={isDetailsModalOpen}
+        onClose={() => setIsDetailsModalOpen(false)}
+        instructor={selectedInstructor}
+      />
     </div>
   );
 }
