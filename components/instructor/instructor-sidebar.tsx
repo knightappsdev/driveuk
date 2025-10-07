@@ -48,6 +48,11 @@ const navigation = [
     icon: MessageCircle,
   },
   {
+    name: 'Profile',
+    href: '/instructor/profile',
+    icon: Users,
+  },
+  {
     name: 'Settings',
     href: '/instructor/settings',
     icon: Settings,

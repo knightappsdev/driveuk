@@ -12,9 +12,11 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Bell, LogOut, User as UserIcon, Settings } from 'lucide-react';
 import ThemeControls from '@/components/theme-controls';
-import { signOut } from '@/app/(login)/actions';
 import { useRouter } from 'next/navigation';
-import { User } from '@/lib/db/schema';
+import { users } from '@/lib/db/schema';
+import { InferSelectModel } from 'drizzle-orm';
+
+type User = InferSelectModel<typeof users>;
 
 interface AdminHeaderProps {
   user: User;
@@ -22,12 +24,33 @@ interface AdminHeaderProps {
 
 export default function AdminHeader({ user }: AdminHeaderProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const router = useRouter();
 
-  async function handleSignOut() {
-    await signOut();
-    router.push('/');
-  }
+  const handleSignOut = async () => {
+    setIsLoggingOut(true);
+    
+    try {
+      const response = await fetch('/api/auth/logout', {
+        method: 'POST',
+      });
+
+      if (response.ok) {
+        // Successful logout - redirect to login page
+        window.location.href = '/login';
+      } else {
+        console.error('Logout failed');
+        // Still redirect even if API call fails (fallback)
+        window.location.href = '/login';
+      }
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Still redirect even if there's an error (fallback)
+      window.location.href = '/login';
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
 
   return (
     <header className="h-16 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between px-6">
@@ -53,16 +76,16 @@ export default function AdminHeader({ user }: AdminHeaderProps) {
         <DropdownMenu open={isMenuOpen} onOpenChange={setIsMenuOpen}>
           <DropdownMenuTrigger>
             <Avatar className="cursor-pointer size-8">
-              <AvatarImage alt={user.name || ''} src={user.avatar || undefined} />
+              <AvatarImage alt={`${user.firstName} ${user.lastName}`} src={user.profilePicture || undefined} />
               <AvatarFallback>
-                {user.name ? user.name.split(' ').map((n) => n[0]).join('') : user.email[0].toUpperCase()}
+                {user.firstName[0] + (user.lastName ? user.lastName[0] : '')}
               </AvatarFallback>
             </Avatar>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
             <div className="px-2 py-1.5 text-sm font-medium text-foreground">
               <div className="flex flex-col space-y-1">
-                <span className="truncate">{user.name || 'Admin User'}</span>
+                <span className="truncate">{`${user.firstName} ${user.lastName}`}</span>
                 <span className="text-xs text-muted-foreground truncate">{user.email}</span>
                 <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full w-fit">
                   Administrator
@@ -83,14 +106,14 @@ export default function AdminHeader({ user }: AdminHeaderProps) {
             
             <DropdownMenuSeparator />
             
-            <form action={handleSignOut} className="w-full">
-              <button type="submit" className="flex w-full">
-                <DropdownMenuItem className="w-full flex-1 cursor-pointer text-red-600 dark:text-red-400">
-                  <LogOut className="mr-2 h-4 w-4" />
-                  <span>Sign Out</span>
-                </DropdownMenuItem>
-              </button>
-            </form>
+            <DropdownMenuItem 
+              onClick={handleSignOut}
+              className="w-full cursor-pointer text-red-600 dark:text-red-400"
+              disabled={isLoggingOut}
+            >
+              <LogOut className="mr-2 h-4 w-4" />
+              <span>{isLoggingOut ? 'Signing out...' : 'Sign Out'}</span>
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

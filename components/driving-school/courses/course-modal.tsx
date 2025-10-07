@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
-import { X, Clock, Car, CheckCircle, Users, TrendingUp, Activity } from 'lucide-react';
+import { X, Clock, Car, CheckCircle, Users, TrendingUp, Activity, MessageCircle } from 'lucide-react';
 import { Course } from './course-card';
 import { useCourseStats } from '@/hooks/use-course-stats';
 
@@ -24,7 +24,12 @@ export default function CourseModal({ course, isOpen, onClose, onBookNow, onMayb
   if (!isOpen || !course) return null;
 
   const handleBookNow = () => {
-    // Create booking message for WhatsApp and email
+    // Just call the onBookNow prop without WhatsApp functionality
+    onBookNow(course, transmissionType);
+  };
+
+  const handleBookViaWhatsApp = () => {
+    // Create booking message for WhatsApp
     const message = `Hello! I'd like to book the ${course.title} course.
 
 Course Details:
@@ -37,19 +42,9 @@ Please contact me to arrange the booking. Thank you!`;
     
     const encodedMessage = encodeURIComponent(message);
     const whatsappUrl = `https://wa.me/447756183484?text=${encodedMessage}`;
-    const emailSubject = encodeURIComponent(`Booking Request: ${course.title} Course`);
-    const emailBody = encodeURIComponent(message);
-    const emailUrl = `mailto:drivingschool@ofemo.uk?subject=${emailSubject}&body=${emailBody}`;
     
     // Open WhatsApp
     window.open(whatsappUrl, '_blank');
-    
-    // Also open email client
-    setTimeout(() => {
-      window.open(emailUrl, '_blank');
-    }, 1000);
-    
-    onBookNow(course, transmissionType);
   };
 
   const handleMaybeLater = () => {
@@ -196,12 +191,22 @@ Please contact me to arrange the booking. Thank you!`;
           </div>
 
           {/* Action Buttons */}
-          <div className="flex gap-3 pt-4">
-            <Button variant="outline" onClick={handleMaybeLater} className="flex-1">
-              Maybe Later
-            </Button>
-            <Button onClick={handleBookNow} className="flex-1 bg-primary hover:bg-primary/90">
-              Book Now - £{course.price}
+          <div className="flex flex-col gap-3 pt-4">
+            <div className="flex gap-3">
+              <Button variant="outline" onClick={handleMaybeLater} className="flex-1">
+                Maybe Later
+              </Button>
+              <Button onClick={handleBookNow} className="flex-1 bg-primary hover:bg-primary/90">
+                Book Now - £{course.price}
+              </Button>
+            </div>
+            <Button 
+              onClick={handleBookViaWhatsApp} 
+              variant="outline"
+              className="w-full bg-green-50 border-green-200 text-green-700 hover:bg-green-100 hover:border-green-300"
+            >
+              <MessageCircle className="w-4 h-4 mr-2" />
+              Book via WhatsApp
             </Button>
           </div>
         </CardContent>

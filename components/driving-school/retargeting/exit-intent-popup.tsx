@@ -10,14 +10,15 @@ import { X, Gift, Car, Clock, CheckCircle } from 'lucide-react';
 interface ExitIntentPopupProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: { email: string; phone: string; name: string }) => void;
+  onSubmit: (data: { email: string; phone: string; name: string; drivingLevel: string }) => void;
 }
 
 export default function ExitIntentPopup({ isOpen, onClose, onSubmit }: ExitIntentPopupProps) {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
-    phone: ''
+    phone: '',
+    drivingLevel: 'Theory' // Default to Theory
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -38,7 +39,7 @@ export default function ExitIntentPopup({ isOpen, onClose, onSubmit }: ExitInten
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.email || !formData.phone || !formData.name) {
+    if (!formData.email || !formData.phone || !formData.name || !formData.drivingLevel) {
       return;
     }
 
@@ -69,7 +70,7 @@ export default function ExitIntentPopup({ isOpen, onClose, onSubmit }: ExitInten
         setTimeout(() => {
           onClose();
           setIsSubmitted(false);
-          setFormData({ name: '', email: '', phone: '' });
+          setFormData({ name: '', email: '', phone: '', drivingLevel: 'Theory' });
         }, 3000);
       } else {
         throw new Error(result.error || 'Failed to submit form');
@@ -177,9 +178,23 @@ export default function ExitIntentPopup({ isOpen, onClose, onSubmit }: ExitInten
                   />
                 </div>
 
+                <div>
+                  <Label htmlFor="popup-driving-level">Driving Level *</Label>
+                  <select
+                    id="popup-driving-level"
+                    value={formData.drivingLevel}
+                    onChange={(e) => handleInputChange('drivingLevel', e.target.value)}
+                    required
+                    className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="Theory">Theory</option>
+                    <option value="Practical">Practical</option>
+                  </select>
+                </div>
+
                 <Button
                   type="submit"
-                  disabled={isSubmitting || !formData.email || !formData.phone || !formData.name}
+                  disabled={isSubmitting || !formData.email || !formData.phone || !formData.name || !formData.drivingLevel}
                   className="w-full bg-gradient-to-r from-blue-600 to-green-600 hover:from-blue-700 hover:to-green-700 text-lg py-6"
                 >
                   {isSubmitting ? (
@@ -190,7 +205,7 @@ export default function ExitIntentPopup({ isOpen, onClose, onSubmit }: ExitInten
                   ) : (
                     <>
                       <Gift className="w-5 h-5 mr-2" />
-                      Claim My FREE Lesson Now!
+                      Claim My Free Lesson Now
                     </>
                   )}
                 </Button>

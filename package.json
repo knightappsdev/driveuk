@@ -25,19 +25,22 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "db:setup": "npx tsx lib/db/setup.ts",
-    "db:seed": "npx tsx lib/db/seed.ts",
+    "db:setup": "echo 'No setup file - create lib/db/setup.ts first'",
+    "db:seed": "echo 'No seed file - create lib/db/seed.ts first'",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
-    "db:test": "node scripts/test-database-connection.js"
+    "db:test": "node scripts/test-database-connection.js",
+    "db:push": "drizzle-kit push"
   },
   "dependencies": {
+    "@neondatabase/serverless": "^1.0.2",
     "@radix-ui/react-avatar": "^1.1.1",
     "@radix-ui/react-dropdown-menu": "^2.1.2",
     "@radix-ui/react-label": "^2.1.7",
     "@radix-ui/react-radio-group": "^1.3.8",
     "@radix-ui/react-slot": "^1.2.3",
+    "@radix-ui/react-switch": "^1.2.6",
     "@radix-ui/react-tabs": "^1.1.13",
     "@tailwindcss/postcss": "4.1.7",
     "@types/node": "^22.15.18",
@@ -47,14 +50,15 @@
     "bcryptjs": "^3.0.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "dotenv": "^16.5.0",
+    "dotenv": "^16.6.1",
     "drizzle-kit": "^0.31.1",
     "drizzle-orm": "^0.43.1",
     "framer-motion": "^12.23.12",
-    "jose": "^6.0.11",
+    "jose": "^6.1.0",
     "lucide-react": "^0.511.0",
     "mysql2": "^3.14.5",
     "next": "15.4.0-canary.47",
+    "node-fetch": "^3.3.2",
     "postcss": "^8.5.3",
     "postgres": "^3.4.7",
     "react": "19.1.0",
@@ -71,6 +75,7 @@
   },
   "devDependencies": {
     "eslint": "9.36.0",
-    "eslint-config-next": "15.5.4"
+    "eslint-config-next": "15.5.4",
+    "tsx": "^4.20.6"
   }
 }

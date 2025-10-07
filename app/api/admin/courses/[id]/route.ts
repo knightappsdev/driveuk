@@ -1,229 +1,202 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db/drizzle';
 import { courses } from '@/lib/db/schema';
-import { validateApiAccess } from '@/lib/auth/auth-helpers';
 import { eq } from 'drizzle-orm';
-import { z } from 'zod';
+import { validateApiAccess } from '@/lib/auth/auth-helpers';
 
-// Validation schema for updates
-const updateCourseSchema = z.object({
-  title: z.string().min(1).max(100).optional(),
-  description: z.string().min(1).optional(),
-  level: z.enum(['absolute-beginner', 'beginner', 'intermediate', 'advanced']).optional(),
-  totalHours: z.number().min(1).max(200).optional(),
-  price: z.number().min(1).optional(),
-  features: z.array(z.string()).optional(),
-  color: z.string().optional(),
-  isRecommended: z.boolean().optional(),
-  isActive: z.boolean().optional(),
-});
-
-// GET: Fetch individual course
+// GET - Get individual course
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const user = await validateApiAccess('admin');
-    
-    if (!user) {
+    const accessResult = await validateApiAccess();
+    if (!accessResult.success) {
       return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
+        { success: false, error: accessResult.error },
+        { status: accessResult.status }
       );
     }
 
     const { id } = await params;
     const courseId = parseInt(id);
+
     if (isNaN(courseId)) {
       return NextResponse.json(
-        { error: 'Invalid course ID' },
+        { success: false, error: 'Invalid course ID' },
         { status: 400 }
       );
     }
 
-    const [course] = await db
+    const course = await db
       .select()
       .from(courses)
       .where(eq(courses.id, courseId))
       .limit(1);
 
-    if (!course) {
+    if (course.length === 0) {
       return NextResponse.json(
-        { error: 'Course not found' },
+        { success: false, error: 'Course not found' },
         { status: 404 }
       );
     }
 
-    return NextResponse.json(course);
-
+    return NextResponse.json({
+      success: true,
+      data: course[0],
+    });
   } catch (error) {
-    console.error('Course fetch error:', error);
+    console.error('Error fetching course:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch course' },
+      { success: false, error: 'Failed to fetch course' },
       { status: 500 }
     );
   }
 }
 
-// PUT: Update course
+// PUT - Update course
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const user = await validateApiAccess('admin');
-    
-    if (!user) {
+    const accessResult = await validateApiAccess();
+    if (!accessResult.success) {
       return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
+        { success: false, error: accessResult.error },
+        { status: accessResult.status }
       );
     }
 
     const { id } = await params;
     const courseId = parseInt(id);
+
     if (isNaN(courseId)) {
       return NextResponse.json(
-        { error: 'Invalid course ID' },
+        { success: false, error: 'Invalid course ID' },
         { status: 400 }
       );
     }
 
     const body = await request.json();
-    const validatedData = updateCourseSchema.parse(body);
+    console.log('Updating course with data:', body);
 
-    // Check if course exists
-    const [existingCourse] = await db
-      .select({ id: courses.id, title: courses.title })
-      .from(courses)
-      .where(eq(courses.id, courseId))
-      .limit(1);
+    // Check if this is a status toggle (only one status field) or a full update
+    const isStatusToggle = Object.keys(body).length === 1 && 
+      (body.hasOwnProperty('isActive') || body.hasOwnProperty('isRecommended'));
 
-    if (!existingCourse) {
+    // Validate required fields only for full updates (not for status toggles)
+    if (!isStatusToggle && (!body.title || !body.description || !body.level)) {
       return NextResponse.json(
-        { error: 'Course not found' },
-        { status: 404 }
+        { success: false, error: 'Missing required fields: title, description, level' },
+        { status: 400 }
       );
     }
 
-    // Check for title conflicts if title is being updated
-    if (validatedData.title && validatedData.title !== existingCourse.title) {
-      const [titleConflict] = await db
-        .select({ id: courses.id })
-        .from(courses)
-        .where(eq(courses.title, validatedData.title))
-        .limit(1);
-
-      if (titleConflict) {
-        return NextResponse.json(
-          { error: 'Course title already exists' },
-          { status: 400 }
-        );
-      }
-    }
-
-    // Update course
+    // Prepare update data based on whether it's a partial or full update
     const updateData: any = {
-      ...(validatedData.title && { title: validatedData.title }),
-      ...(validatedData.description && { description: validatedData.description }),
-      ...(validatedData.level && { level: validatedData.level }),
-      ...(validatedData.totalHours && { totalHours: validatedData.totalHours }),
-      ...(validatedData.price && { price: validatedData.price.toString() }),
-      ...(validatedData.features && { features: validatedData.features }),
-      ...(validatedData.color && { color: validatedData.color }),
-      ...(validatedData.isRecommended !== undefined && { isRecommended: validatedData.isRecommended }),
-      ...(validatedData.isActive !== undefined && { isActive: validatedData.isActive }),
       updatedAt: new Date(),
     };
 
-    const [updatedCourse] = await db
+    if (isStatusToggle) {
+      // For status toggles, only update the specific status field
+      if (body.hasOwnProperty('isActive')) {
+        updateData.isActive = body.isActive;
+      }
+      if (body.hasOwnProperty('isRecommended')) {
+        updateData.isRecommended = body.isRecommended;
+      }
+    } else {
+      // For full updates, include all fields
+      updateData.title = body.title;
+      updateData.description = body.description || null;
+      updateData.level = body.level;
+      updateData.duration = body.duration || 60;
+      updateData.price = body.price ? body.price.toString() : '0.00';
+      updateData.maxStudents = body.maxStudents || 1;
+      updateData.enrolledStudents = body.enrolledStudents || 0;
+      updateData.transmissionType = body.transmissionType || 'manual';
+      updateData.isActive = body.isActive !== undefined ? body.isActive : true;
+      updateData.isRecommended = body.isRecommended !== undefined ? body.isRecommended : false;
+    }
+
+    const updatedCourse = await db
       .update(courses)
       .set(updateData)
       .where(eq(courses.id, courseId))
       .returning();
 
-    return NextResponse.json({
-      message: 'Course updated successfully',
-      course: updatedCourse,
-    });
-
-  } catch (error) {
-    console.error('Course update error:', error);
-    
-    if (error instanceof z.ZodError) {
+    if (updatedCourse.length === 0) {
       return NextResponse.json(
-        { 
-          error: 'Validation failed',
-          details: error.errors 
-        },
-        { status: 400 }
+        { success: false, error: 'Course not found' },
+        { status: 404 }
       );
     }
 
+    return NextResponse.json({
+      success: true,
+      message: 'Course updated successfully',
+      data: updatedCourse[0],
+    });
+  } catch (error) {
+    console.error('Error updating course:', error);
     return NextResponse.json(
-      { error: 'Failed to update course' },
+      { success: false, error: 'Failed to update course' },
       { status: 500 }
     );
   }
 }
 
-// DELETE: Delete course
+// DELETE - Delete course
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const user = await validateApiAccess('admin');
-    
-    if (!user) {
+    const accessResult = await validateApiAccess();
+    if (!accessResult.success) {
       return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
+        { success: false, error: accessResult.error },
+        { status: accessResult.status }
       );
     }
 
     const { id } = await params;
     const courseId = parseInt(id);
+
     if (isNaN(courseId)) {
       return NextResponse.json(
-        { error: 'Invalid course ID' },
+        { success: false, error: 'Invalid course ID' },
         { status: 400 }
       );
     }
 
     // Check if course exists
-    const [existingCourse] = await db
-      .select({ id: courses.id })
+    const existingCourse = await db
+      .select()
       .from(courses)
       .where(eq(courses.id, courseId))
       .limit(1);
 
-    if (!existingCourse) {
+    if (existingCourse.length === 0) {
       return NextResponse.json(
-        { error: 'Course not found' },
+        { success: false, error: 'Course not found' },
         { status: 404 }
       );
     }
 
-    // Soft delete by setting isActive to false instead of hard delete
-    // This preserves course data for existing bookings
-    await db
-      .update(courses)
-      .set({
-        isActive: false,
-        updatedAt: new Date(),
-      })
-      .where(eq(courses.id, courseId));
+    // Delete course
+    await db.delete(courses).where(eq(courses.id, courseId));
 
     return NextResponse.json({
-      message: 'Course deleted successfully',
+      success: true,
+      message: 'Course deleted successfully'
     });
 
   } catch (error) {
-    console.error('Course deletion error:', error);
+    console.error('Error deleting course:', error);
     return NextResponse.json(
-      { error: 'Failed to delete course' },
+      { success: false, error: 'Failed to delete course' },
       { status: 500 }
     );
   }

@@ -10,10 +10,12 @@ import {
   GraduationCap,
   BookOpen,
   Calendar,
-
+  MessageSquare,
+  User,
   Settings,
   BarChart3,
   Home,
+  Brain,
 } from 'lucide-react';
 
 const sidebarItems = [
@@ -43,15 +45,34 @@ const sidebarItems = [
     icon: BookOpen,
   },
   {
+    title: 'Custom Course',
+    href: '/admin/custom-course',
+    icon: Settings,
+  },
+  {
+    title: 'Theory Tests',
+    href: '/admin/theory',
+    icon: Brain,
+  },
+  {
     title: 'Bookings',
     href: '/admin/bookings',
     icon: Calendar,
   },
-
+  {
+    title: 'Messages',
+    href: '/admin/messages',
+    icon: MessageSquare,
+  },
   {
     title: 'Analytics',
     href: '/admin/analytics',
     icon: BarChart3,
+  },
+  {
+    title: 'Profile',
+    href: '/admin/profile',
+    icon: User,
   },
   {
     title: 'Settings',

@@ -9,10 +9,10 @@ import {
   activityLogs, 
   settings, 
   coursePurchases,
-  UserRole,
-  BookingStatus,
-  LessonStatus
-} from './schema';
+  roleEnum,
+  bookingStatusEnum,
+  lessonStatusEnum
+} from './comprehensive-schema';
 import { hashPassword } from '@/lib/auth/session';
 
 // Sample data arrays
@@ -153,7 +153,15 @@ const instructorProfiles = [
     pricePerHour: '35.00',
     location: 'City Centre',
     bio: 'Patient and understanding instructor with 8 years of experience specializing in nervous drivers and intensive courses.',
-    availability: 'Available this week',
+    availability: {
+      monday: { start: '09:00', end: '17:00', available: true },
+      tuesday: { start: '09:00', end: '17:00', available: true },
+      wednesday: { start: '09:00', end: '17:00', available: true },
+      thursday: { start: '09:00', end: '17:00', available: true },
+      friday: { start: '09:00', end: '17:00', available: true },
+      saturday: { start: '09:00', end: '15:00', available: true },
+      sunday: { start: '10:00', end: '14:00', available: false }
+    },
     languages: ['English', 'French'],
     nationality: 'British',
     religion: 'Christian',
@@ -169,7 +177,15 @@ const instructorProfiles = [
     pricePerHour: '38.00',
     location: 'North London',
     bio: 'Experienced manual transmission specialist with advanced driving qualifications and 12 years of teaching experience.',
-    availability: 'Available this week',
+    availability: {
+      monday: { start: '08:00', end: '16:00', available: true },
+      tuesday: { start: '08:00', end: '16:00', available: true },
+      wednesday: { start: '08:00', end: '16:00', available: true },
+      thursday: { start: '08:00', end: '16:00', available: true },
+      friday: { start: '08:00', end: '16:00', available: true },
+      saturday: { start: '09:00', end: '17:00', available: true },
+      sunday: { start: '10:00', end: '14:00', available: false }
+    },
     languages: ['English', 'Mandarin'],
     nationality: 'British Chinese',
     religion: 'Buddhist',
@@ -185,7 +201,15 @@ const instructorProfiles = [
     pricePerHour: '33.00',
     location: 'South London',
     bio: 'Female instructor specializing in automatic transmission and providing comfortable learning environment for female and elderly learners.',
-    availability: 'Available this week',
+    availability: {
+      monday: { start: '10:00', end: '18:00', available: true },
+      tuesday: { start: '10:00', end: '18:00', available: true },
+      wednesday: { start: '10:00', end: '18:00', available: true },
+      thursday: { start: '10:00', end: '18:00', available: true },
+      friday: { start: '10:00', end: '18:00', available: true },
+      saturday: { start: '08:00', end: '16:00', available: true },
+      sunday: { start: '10:00', end: '14:00', available: false }
+    },
     languages: ['English'],
     nationality: 'British',
     religion: 'Christian',
@@ -201,7 +225,15 @@ const instructorProfiles = [
     pricePerHour: '42.00',
     location: 'East London',
     bio: 'Senior instructor with 15 years experience, Pass Plus qualified, specializing in advanced driving skills and motorway instruction.',
-    availability: 'Available this week',
+    availability: {
+      monday: { start: '07:00', end: '19:00', available: true },
+      tuesday: { start: '07:00', end: '19:00', available: true },
+      wednesday: { start: '07:00', end: '19:00', available: true },
+      thursday: { start: '07:00', end: '19:00', available: true },
+      friday: { start: '07:00', end: '19:00', available: true },
+      saturday: { start: '08:00', end: '18:00', available: true },
+      sunday: { start: '09:00', end: '17:00', available: true }
+    },
     languages: ['English'],
     nationality: 'British',
     religion: 'Christian',
@@ -217,7 +249,15 @@ const instructorProfiles = [
     pricePerHour: '30.00',
     location: 'West London',
     bio: 'Energetic instructor specializing in young drivers and intensive courses. Fluent in multiple languages.',
-    availability: 'Available this week',
+    availability: {
+      monday: { start: '11:00', end: '19:00', available: true },
+      tuesday: { start: '11:00', end: '19:00', available: true },
+      wednesday: { start: '11:00', end: '19:00', available: true },
+      thursday: { start: '11:00', end: '19:00', available: true },
+      friday: { start: '11:00', end: '19:00', available: true },
+      saturday: { start: '09:00', end: '17:00', available: true },
+      sunday: { start: '12:00', end: '16:00', available: false }
+    },
     languages: ['English', 'Spanish', 'Portuguese'],
     nationality: 'Spanish',
     religion: 'Catholic',
@@ -379,36 +419,43 @@ const systemSettings = [
   {
     key: 'booking_advance_days',
     value: '30',
+    category: 'booking',
     description: 'Maximum number of days in advance bookings can be made'
   },
   {
     key: 'cancellation_hours',
     value: '24',
+    category: 'booking',
     description: 'Minimum hours before lesson for free cancellation'
   },
   {
     key: 'max_lessons_per_day',
     value: '8',
+    category: 'scheduling',
     description: 'Maximum lessons an instructor can have per day'
   },
   {
     key: 'payment_methods',
     value: 'card,paypal,bank_transfer',
+    category: 'payment',
     description: 'Accepted payment methods'
   },
   {
     key: 'school_name',
     value: 'DriveSchool Pro',
+    category: 'general',
     description: 'Name of the driving school'
   },
   {
     key: 'contact_email',
     value: 'info@driveschool.com',
+    category: 'contact',
     description: 'Main contact email address'
   },
   {
     key: 'contact_phone',
     value: '0800-123-4567',
+    category: 'contact',
     description: 'Main contact phone number'
   }
 ];
@@ -485,7 +532,7 @@ async function seedComprehensive() {
     // 6. Seed Bookings
     console.log('📅 Seeding bookings...');
     const createdBookings = [];
-    const bookingStatuses = [BookingStatus.PENDING, BookingStatus.CONFIRMED, BookingStatus.COMPLETED, BookingStatus.CANCELLED];
+    const bookingStatuses = ['pending', 'confirmed', 'completed', 'cancelled'];
     
     for (let i = 0; i < Math.min(createdStudents.length, 10); i++) {
       const student = createdStudents[i % createdStudents.length];
@@ -514,7 +561,7 @@ async function seedComprehensive() {
     // 7. Seed Lessons
     console.log('📖 Seeding lessons...');
     const createdLessons = [];
-    const lessonStatuses = [LessonStatus.SCHEDULED, LessonStatus.COMPLETED, LessonStatus.CANCELLED, LessonStatus.NO_SHOW];
+    const lessonStatuses = ['scheduled', 'completed', 'cancelled', 'no-show'];
     
     for (let i = 0; i < createdBookings.length; i++) {
       const booking = createdBookings[i];
@@ -559,7 +606,7 @@ async function seedComprehensive() {
       
       await db.insert(activityLogs).values({
         userId: user.id,
-        action: activity,
+        action: activity as any,
         timestamp: logTime,
         ipAddress: `192.168.1.${100 + i}`,
         metadata: {

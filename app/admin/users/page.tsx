@@ -1,374 +1,228 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { 
-  Search, 
-  UserPlus, 
-  MoreHorizontal,
-  Eye,
-  Edit,
-  Trash2,
-  Mail,
-  Phone,
-  RefreshCw
-} from 'lucide-react';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { UserPlus } from 'lucide-react';
+import StatsCards from './StatsCards';
+import SearchFilters from './SearchFilters';
+import UsersTable from './UsersTable';
+import UserModal, { UserFormData } from './UserModal';
+import UserDetailsModal from './UserDetailsModal';
+import ConfirmDialog from '@/components/ui/confirm-dialog';
+import { ApiUser } from './types';
+import { fetchUsers, filterUsers, deleteUser, toggleUserStatus, createUser, updateUser } from './utils';
 
-// Import modal components
-import UserCreateModal from '@/components/admin/users/user-create-modal';
-import UserEditModal from '@/components/admin/users/user-edit-modal';
-import UserDeleteModal from '@/components/admin/users/user-delete-modal';
-import UserDetailsModal from '@/components/admin/users/user-details-modal';
-
-interface User {
-  id: number;
-  name: string;
-  email: string;
-  role: 'admin' | 'instructor' | 'student';
-  isActive: boolean;
-  phone?: string;
-  createdAt: string;
-  updatedAt: string;
-  avatar?: string;
-}
-
-const roleColors = {
-  admin: 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400',
-  instructor: 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400',
-  student: 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400',
-};
-
-export default function AdminUsersPage() {
-  const [users, setUsers] = useState<User[]>([]);
+export default function UsersPage() {
+  const [users, setUsers] = useState<ApiUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedRole, setSelectedRole] = useState<string>('all');
+  const [selectedRole, setSelectedRole] = useState('all');
+  const [selectedStatus, setSelectedStatus] = useState('all');
   
   // Modal states
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isUserModalOpen, setIsUserModalOpen] = useState(false);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<ApiUser | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
-    fetchUsers();
+    const loadUsers = async () => {
+      try {
+        const usersData = await fetchUsers();
+        setUsers(usersData);
+      } catch (error) {
+        console.error('Error fetching users:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadUsers();
   }, []);
 
-  const fetchUsers = async () => {
-    try {
-      const response = await fetch('/api/admin/users');
-      if (response.ok) {
-        const data = await response.json();
-        setUsers(data);
-      }
-    } catch (error) {
-      console.error('Failed to fetch users:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const filteredUsers = filterUsers(users, searchTerm, selectedRole, selectedStatus);
 
-  const filteredUsers = users.filter(user => {
-    const matchesSearch = 
-      user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesRole = selectedRole === 'all' || user.role === selectedRole;
-    
-    return matchesSearch && matchesRole;
-  });
-
-  const handleToggleStatus = async (userId: number, isActive: boolean) => {
-    try {
-      const response = await fetch(`/api/admin/users/${userId}/toggle-status`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ isActive: !isActive }),
-      });
-
-      if (response.ok) {
-        fetchUsers(); // Refresh the list
-      }
-    } catch (error) {
-      console.error('Failed to toggle user status:', error);
-    }
-  };
-
-  // Modal handlers
-  const handleViewUser = (user: User) => {
+  const handleViewDetails = (user: ApiUser) => {
     setSelectedUser(user);
     setIsDetailsModalOpen(true);
   };
 
-  const handleEditUser = (user: User) => {
+  const handleEditUser = (user: ApiUser) => {
     setSelectedUser(user);
-    setIsEditModalOpen(true);
+    setIsEditing(true);
+    setIsUserModalOpen(true);
   };
 
-  const handleDeleteUser = (user: User) => {
-    setSelectedUser(user);
-    setIsDeleteModalOpen(true);
+  const handleDeleteUser = async (userId: number) => {
+    const user = users.find(u => u.id === userId);
+    if (user) {
+      setSelectedUser(user);
+      setIsDeleteDialogOpen(true);
+    }
   };
 
-  const handleUserCreated = () => {
-    fetchUsers();
+  const confirmDeleteUser = async () => {
+    if (!selectedUser) return;
+
+    setIsDeleting(true);
+    try {
+      await deleteUser(selectedUser.id);
+      setUsers(prev => prev.filter(u => u.id !== selectedUser.id));
+      alert('User deleted successfully');
+    } catch (error: any) {
+      console.error('Error deleting user:', error);
+      alert(error.message || 'Error deleting user');
+    } finally {
+      setIsDeleting(false);
+    }
+  };  const handleToggleStatus = async (userId: number) => {
+    const user = users.find(u => u.id === userId);
+    if (!user) return;
+
+    const action = user.isActive ? 'deactivate' : 'activate';
+    if (!confirm(`Are you sure you want to ${action} ${user.name}?`)) {
+      return;
+    }
+
+    try {
+      await toggleUserStatus(userId);
+      setUsers(prev => prev.map(u => 
+        u.id === userId ? { ...u, isActive: !u.isActive } : u
+      ));
+      alert(`User ${action}d successfully`);
+    } catch (error: any) {
+      console.error('Error toggling user status:', error);
+      alert(error.message || `Error ${action.slice(0, -1)}ing user`);
+    }
   };
 
-  const handleUserUpdated = () => {
-    fetchUsers();
+  const handleCreateUser = () => {
+    setSelectedUser(null);
+    setIsEditing(false);
+    setIsUserModalOpen(true);
   };
 
-  const handleUserDeleted = () => {
-    fetchUsers();
+  const handleSaveUser = async (userData: UserFormData) => {
+    setIsSaving(true);
+    try {
+      if (isEditing && selectedUser) {
+        // Update existing user
+        const updatedUser = await updateUser(selectedUser.id, {
+          firstName: userData.firstName,
+          lastName: userData.lastName,
+          phone: userData.phone,
+          role: userData.role,
+          city: userData.city,
+        });
+
+        if (updatedUser) {
+          setUsers(prev => prev.map(u => 
+            u.id === selectedUser.id ? { 
+              ...updatedUser, 
+              name: `${updatedUser.firstName} ${updatedUser.lastName}`.trim()
+            } : u
+          ));
+          alert('User updated successfully!');
+        }
+      } else {
+        // Create new user
+        const newUser = await createUser(userData);
+        if (newUser) {
+          const userWithName = {
+            ...newUser,
+            name: `${newUser.firstName} ${newUser.lastName}`.trim()
+          };
+          setUsers(prev => [userWithName, ...prev]);
+          alert('User created successfully!');
+        }
+      }
+    } catch (error: any) {
+      alert(error.message || 'Failed to save user');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   if (loading) {
     return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Users Management</h1>
-          <p className="mt-2 text-gray-600 dark:text-gray-300">
-            Manage user accounts and permissions
-          </p>
+      <div className="p-6">
+        <div className="animate-pulse space-y-6">
+          <div className="h-8 bg-gray-200 rounded w-64"></div>
+          <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+            {[...Array(6)].map((_, i) => (
+              <div key={i} className="h-24 bg-gray-200 rounded"></div>
+            ))}
+          </div>
+          <div className="h-96 bg-gray-200 rounded"></div>
         </div>
-        <Card>
-          <CardContent className="p-6">
-            <div className="animate-pulse space-y-4">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <div key={i} className="h-12 bg-gray-200 dark:bg-gray-700 rounded"></div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+    <div className="p-6 space-y-6">
+      <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Users Management</h1>
-          <p className="mt-2 text-gray-600 dark:text-gray-300">
-            Manage user accounts and permissions
+          <h1 className="text-3xl font-bold">Users</h1>
+          <p className="text-gray-600 dark:text-gray-300">
+            Manage all users in the system
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button 
-            variant="outline" 
-            onClick={() => fetchUsers()}
-            disabled={loading}
-            className="flex items-center gap-2"
-          >
-            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
-          <Button 
-            onClick={() => setIsCreateModalOpen(true)}
-            className="flex items-center gap-2"
-          >
-            <UserPlus className="h-4 w-4" />
-            Add User
-          </Button>
-        </div>
+        <Button onClick={handleCreateUser} className="flex items-center gap-2">
+          <UserPlus className="w-4 h-4" />
+          Add User
+        </Button>
       </div>
 
-      {/* Filters */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Filters & Search</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col sm:flex-row gap-4">
-            {/* Search */}
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-              <Input
-                placeholder="Search users..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
+      <StatsCards users={users} />
 
-            {/* Role Filter */}
-            <select
-              value={selectedRole}
-              onChange={(e) => setSelectedRole(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-md bg-white dark:bg-gray-800 dark:border-gray-600"
-            >
-              <option value="all">All Roles</option>
-              <option value="admin">Admins</option>
-              <option value="instructor">Instructors</option>
-              <option value="student">Students</option>
-            </select>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Users Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <span>Users ({filteredUsers.length})</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>User</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Contact</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredUsers.map((user) => (
-                  <TableRow key={user.id}>
-                    <TableCell>
-                      <div className="flex items-center space-x-3">
-                        <div className="w-8 h-8 bg-gray-300 dark:bg-gray-600 rounded-full flex items-center justify-center">
-                          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                            {user.name.charAt(0).toUpperCase()}
-                          </span>
-                        </div>
-                        <div>
-                          <div className="font-medium text-gray-900 dark:text-white">
-                            {user.name}
-                          </div>
-                          <div className="text-sm text-gray-500">{user.email}</div>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={roleColors[user.role]}>
-                        {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={user.isActive ? 'default' : 'secondary'}>
-                        {user.isActive ? 'Active' : 'Inactive'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="space-y-1">
-                        <div className="flex items-center text-sm text-gray-600 dark:text-gray-300">
-                          <Mail className="w-3 h-3 mr-1" />
-                          {user.email}
-                        </div>
-                        {user.phone && (
-                          <div className="flex items-center text-sm text-gray-600 dark:text-gray-300">
-                            <Phone className="w-3 h-3 mr-1" />
-                            {user.phone}
-                          </div>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-sm text-gray-600 dark:text-gray-300">
-                      {new Date(user.createdAt).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-8 w-8 p-0">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem 
-                            className="cursor-pointer"
-                            onClick={() => handleViewUser(user)}
-                          >
-                            <Eye className="mr-2 h-4 w-4" />
-                            View Details
-                          </DropdownMenuItem>
-                          <DropdownMenuItem 
-                            className="cursor-pointer"
-                            onClick={() => handleEditUser(user)}
-                          >
-                            <Edit className="mr-2 h-4 w-4" />
-                            Edit User
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="cursor-pointer"
-                            onClick={() => handleToggleStatus(user.id, user.isActive)}
-                          >
-                            {user.isActive ? 'Deactivate' : 'Activate'}
-                          </DropdownMenuItem>
-                          <DropdownMenuItem 
-                            className="cursor-pointer text-red-600"
-                            onClick={() => handleDeleteUser(user)}
-                          >
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Delete User
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-
-          {filteredUsers.length === 0 && (
-            <div className="text-center py-8">
-              <p className="text-gray-500 dark:text-gray-400">No users found matching your criteria.</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Modals */}
-      <UserCreateModal
-        isOpen={isCreateModalOpen}
-        onClose={() => setIsCreateModalOpen(false)}
-        onUserCreated={handleUserCreated}
+      <SearchFilters
+        searchTerm={searchTerm}
+        onSearchChange={setSearchTerm}
+        selectedRole={selectedRole}
+        onRoleChange={setSelectedRole}
+        selectedStatus={selectedStatus}
+        onStatusChange={setSelectedStatus}
       />
 
-      <UserEditModal
-        isOpen={isEditModalOpen}
-        onClose={() => setIsEditModalOpen(false)}
-        onUserUpdated={handleUserUpdated}
-        user={selectedUser}
+      <UsersTable
+        users={filteredUsers}
+        onViewDetails={handleViewDetails}
+        onEditUser={handleEditUser}
+        onDeleteUser={handleDeleteUser}
+        onToggleStatus={handleToggleStatus}
       />
 
-      <UserDeleteModal
-        isOpen={isDeleteModalOpen}
-        onClose={() => setIsDeleteModalOpen(false)}
-        onUserDeleted={handleUserDeleted}
-        user={selectedUser}
+      {/* User Create/Edit Modal */}
+      <UserModal
+        open={isUserModalOpen}
+        onOpenChange={setIsUserModalOpen}
+        user={isEditing ? selectedUser : null}
+        onSave={handleSaveUser}
+        isLoading={isSaving}
       />
 
+      {/* User Details Modal */}
       <UserDetailsModal
-        isOpen={isDetailsModalOpen}
-        onClose={() => setIsDetailsModalOpen(false)}
+        open={isDetailsModalOpen}
+        onOpenChange={setIsDetailsModalOpen}
         user={selectedUser}
+        onEdit={handleEditUser}
+      />
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        open={isDeleteDialogOpen}
+        onOpenChange={setIsDeleteDialogOpen}
+        title="Delete User"
+        description={`Are you sure you want to delete ${selectedUser?.name}? This action cannot be undone.`}
+        confirmText="Delete"
+        variant="destructive"
+        onConfirm={confirmDeleteUser}
+        isLoading={isDeleting}
       />
     </div>
   );

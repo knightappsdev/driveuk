@@ -75,7 +75,7 @@ export default function HeroSection({ onBookLessons, onFreeConsultation }: HeroS
   };
 
   return (
-    <section className="relative min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-green-50 overflow-hidden">
+    <section id="hero" className="relative min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-green-50 overflow-hidden">
       {/* Animated Gradient Overlay */}
       <div className="absolute inset-0 bg-gradient-to-r from-blue-600/5 via-transparent to-green-600/5 animate-gradient-shift"></div>
       {/* Enhanced Background Elements */}

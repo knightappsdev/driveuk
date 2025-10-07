@@ -1,315 +1,231 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db/drizzle';
-import { users, students } from '@/lib/db/schema';
 import { validateApiAccess } from '@/lib/auth/auth-helpers';
-import { eq, and, isNull } from 'drizzle-orm';
-import { z } from 'zod';
+import { db } from '@/lib/db/drizzle';
+import { students, users } from '@/lib/db/schema';
+import { eq, and } from 'drizzle-orm';
 
-// Validation schema for updates
-const updateStudentSchema = z.object({
-  // User fields
-  name: z.string().min(1).max(100).optional(),
-  email: z.string().email().max(255).optional(),
-  phone: z.string().optional(),
-  avatar: z.string().url().optional().or(z.literal('')),
-  isActive: z.boolean().optional(),
-  
-  // Student specific fields
-  dateOfBirth: z.string().optional(),
-  address: z.string().optional(),
-  emergencyContact: z.string().optional(),
-  licenseStatus: z.enum(['none', 'provisional', 'full']).optional(),
-  medicalConditions: z.string().optional(),
-});
-
-// GET: Fetch individual student
+// GET - Fetch single student
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const user = await validateApiAccess('admin');
-    
-    if (!user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
+    await validateApiAccess();
     const { id } = await params;
     const studentId = parseInt(id);
+
     if (isNaN(studentId)) {
       return NextResponse.json(
-        { error: 'Invalid student ID' },
+        { success: false, error: 'Invalid student ID' },
         { status: 400 }
       );
     }
 
-    const [student] = await db
+    const student = await db
       .select({
+        // Student fields
         id: students.id,
         userId: students.userId,
+        licenseType: students.licenseType,
+        licenseNumber: students.licenseNumber,
+        theoryTestPassed: students.theoryTestPassed,
+        theoryTestDate: students.theoryTestDate,
+        practicalTestDate: students.practicalTestDate,
+        practicalTestPassed: students.practicalTestPassed,
         dateOfBirth: students.dateOfBirth,
         address: students.address,
+        postcode: students.postcode,
         emergencyContact: students.emergencyContact,
-        licenseStatus: students.licenseStatus,
         medicalConditions: students.medicalConditions,
+        learningGoals: students.learningGoals,
+        previousDrivingExperience: students.previousDrivingExperience,
+        preferredInstructorGender: students.preferredInstructorGender,
+        preferredLanguage: students.preferredLanguage,
+        drivingLevel: students.drivingLevel,
+        startDate: students.startDate,
         createdAt: students.createdAt,
         updatedAt: students.updatedAt,
         // User fields
-        userName: users.name,
-        userEmail: users.email,
-        userPhone: users.phone,
-        userAvatar: users.avatar,
-        userIsActive: users.isActive,
-      })
-      .from(students)
-      .innerJoin(users, eq(students.userId, users.id))
-      .where(and(
-        eq(students.id, studentId),
-        isNull(users.deletedAt)
-      ))
-      .limit(1);
-
-    if (!student) {
-      return NextResponse.json(
-        { error: 'Student not found' },
-        { status: 404 }
-      );
-    }
-
-    return NextResponse.json(student);
-
-  } catch (error) {
-    console.error('Student fetch error:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch student' },
-      { status: 500 }
-    );
-  }
-}
-
-// PUT: Update student
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const user = await validateApiAccess('admin');
-    
-    if (!user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
-    const { id } = await params;
-    const studentId = parseInt(id);
-    if (isNaN(studentId)) {
-      return NextResponse.json(
-        { error: 'Invalid student ID' },
-        { status: 400 }
-      );
-    }
-
-    const body = await request.json();
-    const validatedData = updateStudentSchema.parse(body);
-
-    // Check if student exists
-    const [existingStudent] = await db
-      .select({ 
-        id: students.id, 
-        userId: students.userId 
-      })
-      .from(students)
-      .innerJoin(users, eq(students.userId, users.id))
-      .where(and(
-        eq(students.id, studentId),
-        isNull(users.deletedAt)
-      ))
-      .limit(1);
-
-    if (!existingStudent) {
-      return NextResponse.json(
-        { error: 'Student not found' },
-        { status: 404 }
-      );
-    }
-
-    // Check for email conflicts if email is being updated
-    if (validatedData.email) {
-      const [emailConflict] = await db
-        .select({ id: users.id })
-        .from(users)
-        .where(and(
-          eq(users.email, validatedData.email),
-          eq(users.id, existingStudent.userId)
-        ))
-        .limit(1);
-
-      if (!emailConflict) {
-        const [otherEmailUser] = await db
-          .select({ id: users.id })
-          .from(users)
-          .where(eq(users.email, validatedData.email))
-          .limit(1);
-
-        if (otherEmailUser) {
-          return NextResponse.json(
-            { error: 'Email already exists' },
-            { status: 400 }
-          );
-        }
-      }
-    }
-
-    // Separate user fields from student fields
-    const userFields = {
-      ...(validatedData.name && { name: validatedData.name }),
-      ...(validatedData.email && { email: validatedData.email }),
-      ...(validatedData.phone !== undefined && { phone: validatedData.phone || null }),
-      ...(validatedData.avatar !== undefined && { avatar: validatedData.avatar || null }),
-      ...(validatedData.isActive !== undefined && { isActive: validatedData.isActive }),
-      updatedAt: new Date(),
-    };
-
-    const studentFields = {
-      ...(validatedData.dateOfBirth !== undefined && { 
-        dateOfBirth: validatedData.dateOfBirth ? new Date(validatedData.dateOfBirth) : null 
-      }),
-      ...(validatedData.address !== undefined && { address: validatedData.address || null }),
-      ...(validatedData.emergencyContact !== undefined && { emergencyContact: validatedData.emergencyContact || null }),
-      ...(validatedData.licenseStatus && { licenseStatus: validatedData.licenseStatus }),
-      ...(validatedData.medicalConditions !== undefined && { medicalConditions: validatedData.medicalConditions || null }),
-      updatedAt: new Date(),
-    };
-
-    // Update user table if there are user field changes
-    if (Object.keys(userFields).length > 1) {
-      await db
-        .update(users)
-        .set(userFields)
-        .where(eq(users.id, existingStudent.userId));
-    }
-
-    // Update student table if there are student field changes
-    if (Object.keys(studentFields).length > 1) {
-      await db
-        .update(students)
-        .set(studentFields)
-        .where(eq(students.id, studentId));
-    }
-
-    // Fetch updated student data
-    const [updatedStudent] = await db
-      .select({
-        id: students.id,
-        userId: students.userId,
-        dateOfBirth: students.dateOfBirth,
-        address: students.address,
-        emergencyContact: students.emergencyContact,
-        licenseStatus: students.licenseStatus,
-        medicalConditions: students.medicalConditions,
-        createdAt: students.createdAt,
-        updatedAt: students.updatedAt,
-        // User fields
-        userName: users.name,
-        userEmail: users.email,
-        userPhone: users.phone,
-        userAvatar: users.avatar,
-        userIsActive: users.isActive,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        email: users.email,
+        phone: users.phone,
+        city: users.city,
+        isActive: users.isActive,
+        role: users.role,
       })
       .from(students)
       .innerJoin(users, eq(students.userId, users.id))
       .where(eq(students.id, studentId))
       .limit(1);
 
-    return NextResponse.json({
-      message: 'Student updated successfully',
-      student: updatedStudent,
-    });
-
-  } catch (error) {
-    console.error('Student update error:', error);
-    
-    if (error instanceof z.ZodError) {
+    if (student.length === 0) {
       return NextResponse.json(
-        { 
-          error: 'Validation failed',
-          details: error.errors 
-        },
-        { status: 400 }
+        { success: false, error: 'Student not found' },
+        { status: 404 }
       );
     }
 
+    return NextResponse.json({
+      success: true,
+      data: student[0]
+    });
+
+  } catch (error) {
+    console.error('Error fetching student:', error);
     return NextResponse.json(
-      { error: 'Failed to update student' },
+      { success: false, error: 'Failed to fetch student' },
       { status: 500 }
     );
   }
 }
 
-// DELETE: Delete student
+// PUT - Update student
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    await validateApiAccess();
+    const { id } = await params;
+    const studentId = parseInt(id);
+
+    if (isNaN(studentId)) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid student ID' },
+        { status: 400 }
+      );
+    }
+
+    const body = await request.json();
+    console.log('Updating student:', studentId, body);
+
+    // Check if student exists
+    const existingStudent = await db
+      .select({ id: students.id, userId: students.userId })
+      .from(students)
+      .where(eq(students.id, studentId))
+      .limit(1);
+
+    if (existingStudent.length === 0) {
+      return NextResponse.json(
+        { success: false, error: 'Student not found' },
+        { status: 404 }
+      );
+    }
+
+    const userId = existingStudent[0].userId;
+
+    // Update student data
+    const studentUpdateData: any = {};
+    if (body.licenseType !== undefined) studentUpdateData.licenseType = body.licenseType;
+    if (body.licenseNumber !== undefined) studentUpdateData.licenseNumber = body.licenseNumber;
+    if (body.theoryTestPassed !== undefined) studentUpdateData.theoryTestPassed = body.theoryTestPassed;
+    if (body.theoryTestDate !== undefined) studentUpdateData.theoryTestDate = body.theoryTestDate || null;
+    if (body.practicalTestDate !== undefined) studentUpdateData.practicalTestDate = body.practicalTestDate || null;
+    if (body.practicalTestPassed !== undefined) studentUpdateData.practicalTestPassed = body.practicalTestPassed;
+    if (body.dateOfBirth !== undefined) studentUpdateData.dateOfBirth = body.dateOfBirth || null;
+    if (body.address !== undefined) studentUpdateData.address = body.address;
+    if (body.postcode !== undefined) studentUpdateData.postcode = body.postcode;
+    if (body.emergencyContact !== undefined) studentUpdateData.emergencyContact = body.emergencyContact;
+    if (body.medicalConditions !== undefined) studentUpdateData.medicalConditions = body.medicalConditions;
+    if (body.learningGoals !== undefined) studentUpdateData.learningGoals = body.learningGoals;
+    if (body.previousDrivingExperience !== undefined) studentUpdateData.previousDrivingExperience = body.previousDrivingExperience;
+    if (body.preferredInstructorGender !== undefined) studentUpdateData.preferredInstructorGender = body.preferredInstructorGender;
+    if (body.preferredLanguage !== undefined) studentUpdateData.preferredLanguage = body.preferredLanguage;
+    if (body.drivingLevel !== undefined) studentUpdateData.drivingLevel = body.drivingLevel;
+    if (body.startDate !== undefined) studentUpdateData.startDate = body.startDate || null;
+
+    // Update user data
+    const userUpdateData: any = {};
+    if (body.firstName !== undefined) userUpdateData.firstName = body.firstName;
+    if (body.lastName !== undefined) userUpdateData.lastName = body.lastName;
+    if (body.email !== undefined) userUpdateData.email = body.email;
+    if (body.phone !== undefined) userUpdateData.phone = body.phone;
+    if (body.city !== undefined) userUpdateData.city = body.city;
+    if (body.isActive !== undefined) userUpdateData.isActive = body.isActive;
+
+    // Update student record if there's student data to update
+    if (Object.keys(studentUpdateData).length > 0) {
+      studentUpdateData.updatedAt = new Date();
+      await db
+        .update(students)
+        .set(studentUpdateData)
+        .where(eq(students.id, studentId));
+    }
+
+    // Update user record if there's user data to update
+    if (Object.keys(userUpdateData).length > 0) {
+      await db
+        .update(users)
+        .set(userUpdateData)
+        .where(eq(users.id, userId));
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: 'Student updated successfully'
+    });
+
+  } catch (error) {
+    console.error('Error updating student:', error);
+    return NextResponse.json(
+      { success: false, error: 'Failed to update student' },
+      { status: 500 }
+    );
+  }
+}
+
+// DELETE - Delete student
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const user = await validateApiAccess('admin');
-    
-    if (!user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
+    await validateApiAccess();
     const { id } = await params;
     const studentId = parseInt(id);
+
     if (isNaN(studentId)) {
       return NextResponse.json(
-        { error: 'Invalid student ID' },
+        { success: false, error: 'Invalid student ID' },
         { status: 400 }
       );
     }
 
-    // Check if student exists and get user ID
-    const [existingStudent] = await db
+    console.log('Deleting student:', studentId);
+
+    // Check if student exists and get the userId
+    const existingStudent = await db
       .select({ id: students.id, userId: students.userId })
       .from(students)
-      .innerJoin(users, eq(students.userId, users.id))
-      .where(and(
-        eq(students.id, studentId),
-        isNull(users.deletedAt)
-      ))
+      .where(eq(students.id, studentId))
       .limit(1);
 
-    if (!existingStudent) {
+    if (existingStudent.length === 0) {
       return NextResponse.json(
-        { error: 'Student not found' },
+        { success: false, error: 'Student not found' },
         { status: 404 }
       );
     }
 
-    // Soft delete the user (which will cascade to hide the student)
-    await db
-      .update(users)
-      .set({
-        deletedAt: new Date(),
-        isActive: false,
-      })
-      .where(eq(users.id, existingStudent.userId));
+    const userId = existingStudent[0].userId;
+
+    // Delete student record first (due to foreign key constraint)
+    await db.delete(students).where(eq(students.id, studentId));
+
+    // Delete associated user record
+    await db.delete(users).where(eq(users.id, userId));
 
     return NextResponse.json({
-      message: 'Student deleted successfully',
+      success: true,
+      message: 'Student deleted successfully'
     });
 
   } catch (error) {
-    console.error('Student deletion error:', error);
+    console.error('Error deleting student:', error);
     return NextResponse.json(
-      { error: 'Failed to delete student' },
+      { success: false, error: 'Failed to delete student' },
       { status: 500 }
     );
   }

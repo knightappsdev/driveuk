@@ -1,67 +1,68 @@
-import { compare, hash } from 'bcryptjs';
-import { SignJWT, jwtVerify } from 'jose';
+import bcryptjs from 'bcryptjs';
 import { cookies } from 'next/headers';
-import { User } from '@/lib/db/schema';
+import { NextRequest, NextResponse } from 'next/server';
+import { jwtVerify, SignJWT } from 'jose';
 
-const key = new TextEncoder().encode(process.env.AUTH_SECRET);
-const SALT_ROUNDS = 10;
+const secret = new TextEncoder().encode(process.env.JWT_SECRET || 'your-secret-key-here');
 
-export async function hashPassword(password: string) {
-  return hash(password, SALT_ROUNDS);
+export interface SessionData {
+  userId: string;
+  email: string;
+  role: string;
+  firstName: string;
+  lastName: string;
+  exp: number;
 }
 
-export async function comparePasswords(
-  plainTextPassword: string,
-  hashedPassword: string
-) {
-  return compare(plainTextPassword, hashedPassword);
+export async function hashPassword(password: string): Promise<string> {
+  return bcryptjs.hash(password, 12);
 }
 
-type SessionData = {
-  user: { 
-    id: number;
-    role: string;
-    email: string;
-  };
-  expires: string;
-};
+export async function comparePasswords(plainPassword: string, hashedPassword: string): Promise<boolean> {
+  return bcryptjs.compare(plainPassword, hashedPassword);
+}
 
-export async function signToken(payload: SessionData) {
-  return await new SignJWT(payload)
+export async function createJWT(payload: Omit<SessionData, 'exp'>): Promise<string> {
+  const exp = Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 7; // 7 days
+  
+  return new SignJWT({ ...payload, exp })
     .setProtectedHeader({ alg: 'HS256' })
-    .setIssuedAt()
-    .setExpirationTime('1 day from now')
-    .sign(key);
+    .setExpirationTime(exp)
+    .sign(secret);
 }
 
-export async function verifyToken(input: string) {
-  const { payload } = await jwtVerify(input, key, {
-    algorithms: ['HS256'],
-  });
-  return payload as SessionData;
+export async function verifyJWT(token: string): Promise<SessionData | null> {
+  try {
+    const { payload } = await jwtVerify(token, secret);
+    return payload as unknown as SessionData;
+  } catch {
+    return null;
+  }
 }
 
-export async function getSession() {
-  const session = (await cookies()).get('session')?.value;
-  if (!session) return null;
-  return await verifyToken(session);
-}
-
-export async function setSession(user: User) {
-  const expiresInOneDay = new Date(Date.now() + 24 * 60 * 60 * 1000);
-  const session: SessionData = {
-    user: { 
-      id: user.id!,
-      role: user.role || 'student',
-      email: user.email || ''
-    },
-    expires: expiresInOneDay.toISOString(),
-  };
-  const encryptedSession = await signToken(session);
-  (await cookies()).set('session', encryptedSession, {
-    expires: expiresInOneDay,
+export async function setSession(sessionData: Omit<SessionData, 'exp'>): Promise<void> {
+  const token = await createJWT(sessionData);
+  const cookieStore = await cookies();
+  
+  cookieStore.set('session', token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
+    sameSite: 'strict',
+    maxAge: 60 * 60 * 24 * 7, // 7 days
+    path: '/',
   });
+}
+
+export async function getSession(): Promise<SessionData | null> {
+  const cookieStore = await cookies();
+  const token = cookieStore.get('session')?.value;
+  
+  if (!token) return null;
+  
+  return verifyJWT(token);
+}
+
+export async function clearSession(): Promise<void> {
+  const cookieStore = await cookies();
+  cookieStore.delete('session');
 }

@@ -5,39 +5,39 @@ import HeroSection from '@/components/driving-school/landing/hero-section';
 import UKLicenseProcessEnhanced from '@/components/driving-school/process/uk-license-process-enhanced';
 import CourseCard from '@/components/driving-school/courses/course-card';
 import CourseModal from '@/components/driving-school/courses/course-modal';
+import CustomCourseCard from '@/components/driving-school/custom-course-card';
+import CustomCourseModal from '@/components/driving-school/custom-course-modal';
 import { CoursePurchaseCounter } from '@/components/ui/course-purchase-counter';
-import InstructorCard from '@/components/driving-school/instructors/instructor-card';
-import InstructorFilters from '@/components/driving-school/instructors/instructor-filters';
+import DynamicInstructorSection from '@/components/driving-school/instructors/dynamic-instructor-section';
+import JoinPlatformCTA from '@/components/driving-school/instructors/join-platform-cta';
 import WhatsAppWidget from '@/components/driving-school/whatsapp/whatsapp-widget';
 import ExitIntentPopup from '@/components/driving-school/retargeting/exit-intent-popup';
 import ScrollToTop from '@/components/scroll-to-top';
+import StudentAuthModal from '@/components/auth/student-auth-modal';
+import Footer from '@/components/footer';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { drivingInstructors, getInstructorsByFilters } from '@/lib/data/instructors';
 import { Course } from '@/components/driving-school/courses/course-card';
-import { Instructor } from '@/components/driving-school/instructors/instructor-card';
 import { useExitIntent } from '@/hooks/use-exit-intent';
-import { ArrowRight, Star, Users, CheckCircle, Play, Phone, Calendar, MessageCircle, Bell, BookOpen } from 'lucide-react';
+import { useAuth } from '@/hooks/use-auth';
+import { ArrowRight, Star, Users, CheckCircle, Calendar, MessageCircle, Bell, BookOpen } from 'lucide-react';
+import TheoryCtaSection from '@/components/driving-school/theory-cta-section';
 
 export default function HomePage() {
+  const { user, isAuthenticated, isStudent, loading: authLoading } = useAuth();
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [isCourseModalOpen, setIsCourseModalOpen] = useState(false);
+  const [isCustomCourseModalOpen, setIsCustomCourseModalOpen] = useState(false);
   const [isExitIntentPopupOpen, setIsExitIntentPopupOpen] = useState(false);
   const [showWhatsAppOnExit, setShowWhatsAppOnExit] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [isStudentAuthModalOpen, setIsStudentAuthModalOpen] = useState(false);
+  const [pendingCourse, setPendingCourse] = useState<{ course: Course; transmissionType: string } | null>(null);
   const [courses, setCourses] = useState<Course[]>([]);
   const [coursesLoading, setCoursesLoading] = useState(true);
   const [lastCourseUpdate, setLastCourseUpdate] = useState<Date | null>(null);
-  const [instructorFilters, setInstructorFilters] = useState({
-    location: '',
-    transmission: '',
-    nationality: '',
-    religion: '',
-    ethnicity: '',
-    gender: ''
-  });
-  const [filteredInstructors, setFilteredInstructors] = useState<Instructor[]>(drivingInstructors.slice(0, 6));
+
 
   // Fetch courses from API with real-time updates
   useEffect(() => {
@@ -87,28 +87,106 @@ export default function HomePage() {
     setIsCourseModalOpen(true);
   };
 
+  const handleCustomCourseViewDetails = () => {
+    setIsCustomCourseModalOpen(true);
+  };
+
   const handleBookCourse = async (course: Course, transmissionType: string) => {
     console.log('Booking course:', course.title, 'Transmission:', transmissionType);
     
+    // Close the course modal first
     setIsCourseModalOpen(false);
+    
+    // Check if user is authenticated and is a student
+    if (!isAuthenticated) {
+      // Store the course details for after authentication
+      setPendingCourse({ course, transmissionType });
+      setIsStudentAuthModalOpen(true);
+      return;
+    }
+    
+    if (!isStudent) {
+      // If user is not a student (instructor/admin), redirect to student registration
+      alert('Please create a student account to book courses. Redirecting to registration...');
+      setPendingCourse({ course, transmissionType });
+      setIsStudentAuthModalOpen(true);
+      return;
+    }
+    
+    // User is authenticated as a student - proceed with booking
+    proceedWithBooking(course, transmissionType);
+  };
+
+  const proceedWithBooking = (course: Course, transmissionType: string) => {
+    // TODO: Implement actual booking logic
+    console.log('Proceeding with booking for authenticated student:', {
+      user: user?.email,
+      course: course.title,
+      transmissionType
+    });
+    
+    // For now, redirect to dashboard or show success message
+    alert(`Booking initiated for ${course.title}! You will be redirected to your dashboard to complete the booking.`);
+    
+    // In a real implementation, you might:
+    // 1. Create a booking record
+    // 2. Redirect to payment
+    // 3. Send confirmation email
+    // 4. Update course enrollment
+    
+    // For now, just redirect to dashboard
+    window.location.href = '/dashboard';
+  };
+
+  const handleBookCustomCourse = async (selectedSkills: string[], totalCost: number) => {
+    console.log('Booking custom course:', { selectedSkills, totalCost });
+    
+    // Check if user is authenticated and is a student
+    if (!isAuthenticated) {
+      setIsStudentAuthModalOpen(true);
+      return;
+    }
+    
+    if (!isStudent) {
+      alert('Please create a student account to book courses. Redirecting to registration...');
+      setIsStudentAuthModalOpen(true);
+      return;
+    }
+    
+    // User is authenticated as a student - proceed with custom booking
+    console.log('Proceeding with custom course booking for authenticated student:', {
+      user: user?.email,
+      selectedSkills,
+      totalCost,
+      estimatedHours: selectedSkills.length
+    });
+    
+    alert(`Custom course booking initiated! Total cost: £${totalCost} for ${selectedSkills.length} skill${selectedSkills.length !== 1 ? 's' : ''}. You will be redirected to your dashboard to complete the booking.`);
+    
+    // In a real implementation, you might:
+    // 1. Create a custom course record with selected skills
+    // 2. Redirect to payment
+    // 3. Send confirmation email with skill breakdown
+    // 4. Schedule individual sessions for each skill
+    
+    // For now, just redirect to dashboard
+    window.location.href = '/dashboard';
+  };
+
+  const handleStudentAuthSuccess = () => {
+    // Authentication successful, proceed with pending booking
+    if (pendingCourse) {
+      proceedWithBooking(pendingCourse.course, pendingCourse.transmissionType);
+      setPendingCourse(null);
+    }
+    setIsStudentAuthModalOpen(false);
   };
 
   const handleMaybeLater = () => {
     setIsExitIntentPopupOpen(true);
   };
 
-  const handleInstructorFiltersChange = (filters: typeof instructorFilters) => {
-    setInstructorFilters(filters);
-    const filtered = getInstructorsByFilters({
-      location: filters.location || undefined,
-      transmission: filters.transmission as 'manual' | 'automatic' || undefined,
-      nationality: filters.nationality || undefined,
-      religion: filters.religion || undefined,
-      ethnicity: filters.ethnicity || undefined,
-      gender: filters.gender as 'Male' | 'Female' | 'Non-binary' || undefined
-    });
-    setFilteredInstructors(filtered.length > 0 ? filtered.slice(0, 6) : drivingInstructors.slice(0, 6));
-  };
+
 
   const handleExitIntentSubmit = async (data: { email: string; phone: string; name: string }) => {
     console.log('Exit intent form submitted:', data);
@@ -118,18 +196,31 @@ export default function HomePage() {
     window.open(whatsappUrl, '_blank');
   };
 
-  const handleInstructorContact = (instructor: Instructor, method: 'phone' | 'whatsapp') => {
-    if (method === 'phone') {
-      window.open(`tel:+447123456789`, '_self');
-    } else {
-      const message = `Hi! I'd like to book driving lessons with ${instructor.name}. Can you help me?`;
-      const encodedMessage = encodeURIComponent(message);
-      window.open(`https://wa.me/447123456789?text=${encodedMessage}`, '_blank');
-    }
-  };
+
 
   const handleBookLessons = () => {
+    // Check authentication status
+    if (!isAuthenticated) {
+      // Not authenticated - show authentication modal
+      setIsStudentAuthModalOpen(true);
+      return;
+    }
+    
+    if (!isStudent) {
+      // Authenticated but not a student - redirect to student registration
+      alert('Please create a student account to book lessons. You can sign up below.');
+      setIsStudentAuthModalOpen(true);
+      return;
+    }
+    
+    // User is authenticated as a student - scroll to courses
     document.getElementById('courses')?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const handleBookLessonsSuccess = () => {
+    // After successful authentication, scroll to courses
+    document.getElementById('courses')?.scrollIntoView({ behavior: 'smooth' });
+    setIsStudentAuthModalOpen(false);
   };
 
   const handleFreeConsultation = () => {
@@ -151,6 +242,9 @@ export default function HomePage() {
       {/* Enhanced UK License Process Section */}
       <UKLicenseProcessEnhanced />
 
+      {/* Theory Test CTA Section */}
+      <TheoryCtaSection />
+
       {/* Courses Section */}
       <section id="courses" className="py-20">
         <div className="container mx-auto px-4">
@@ -163,7 +257,7 @@ export default function HomePage() {
 
           {coursesLoading ? (
             <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
-              {Array.from({ length: 4 }).map((_, i) => (
+              {Array.from({ length: 5 }).map((_, i) => (
                 <div key={i} className="animate-pulse">
                   <div className="bg-gray-200 rounded-lg h-80"></div>
                 </div>
@@ -171,6 +265,7 @@ export default function HomePage() {
             </div>
           ) : (
             <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+              {/* Regular Courses */}
               {courses.map((course) => (
                 <CourseCard 
                   key={course.id} 
@@ -178,6 +273,9 @@ export default function HomePage() {
                   onViewDetails={handleCourseViewDetails}
                 />
               ))}
+              
+              {/* Custom Course Card */}
+              <CustomCourseCard onViewDetails={handleCustomCourseViewDetails} />
             </div>
           )}
           
@@ -191,90 +289,73 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="py-20 bg-gradient-to-r from-blue-600 to-green-600 text-white">
-        <div className="container mx-auto px-4 text-center">
-          <h2 className="text-3xl lg:text-4xl font-bold mb-4">Ready to Start Your Driving Journey?</h2>
-          <p className="text-xl mb-8 opacity-90 max-w-2xl mx-auto">
-            Join thousands of successful drivers who learned with DriveSchool Pro. Book your first lesson today!
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button 
-              size="lg" 
-              className="bg-white text-blue-600 hover:bg-gray-100 text-lg px-8 py-6"
-              onClick={() => document.getElementById('courses')?.scrollIntoView({ behavior: 'smooth' })}
-            >
-              <Calendar className="w-5 h-5 mr-2" />
-              Book Now
-            </Button>
-            <Button 
-              size="lg" 
-              variant="outline" 
-              className="border-yellow-400 text-yellow-400 hover:bg-yellow-400 hover:text-white text-lg px-8 py-6 font-bold shadow-lg animate-pulse hover:animate-none transition-all duration-300 border-2"
-              onClick={() => window.open('tel:+447756183484', '_self')}
-            >
-              <Phone className="w-5 h-5 mr-2" />
-              📞 Call Us Today
-            </Button>
-
-          </div>
-        </div>
-      </section>
-
-      {/* Instructors Section */}
-      <section id="instructors" className="py-20 bg-gray-50">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl lg:text-4xl font-bold mb-4">Find Your Perfect Instructor</h2>
-            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-              Search by location to find experienced, qualified instructors in your area
-            </p>
-          </div>
-
-          <div className="grid lg:grid-cols-4 gap-8">
-            <div className="lg:col-span-1">
-              <InstructorFilters 
-                onFiltersChange={handleInstructorFiltersChange}
-                filters={instructorFilters}
-              />
+      {/* Student Dashboard Section - Only shown to authenticated students */}
+      {isAuthenticated && isStudent && (
+        <section className="py-16 bg-blue-50">
+          <div className="container mx-auto px-4">
+            <div className="text-center mb-12">
+              <h2 className="text-3xl font-bold mb-4">Your Learning Dashboard</h2>
+              <p className="text-xl text-gray-600">Quick access to your learning tools and progress</p>
             </div>
 
-            <div className="lg:col-span-3">
-              {filteredInstructors.length > 0 ? (
-                <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-6">
-                  {filteredInstructors.map((instructor) => (
-                    <InstructorCard
-                      key={instructor.id}
-                      instructor={instructor}
-                      onViewProfile={(instructor) => {
-                        const message = `Hi! I'd like to view the profile and get more information about instructor ${instructor.name}. Please provide me with detailed information about their availability and teaching style.`;
-                        const encodedMessage = encodeURIComponent(message);
-                        window.open(`https://wa.me/447756183484?text=${encodedMessage}`, '_blank');
-                      }}
-                      onContact={handleInstructorContact}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-12">
-                  <Users className="w-16 h-16 mx-auto mb-4 text-gray-400" />
-                  <h3 className="text-xl font-semibold mb-2">No instructors found</h3>
-                  <p className="text-gray-600">Try adjusting your filters or contact us for availability</p>
-                </div>
-              )}
+            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {/* Theory Test Practice */}
+              <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => window.location.href = '/theory'}>
+                <CardContent className="p-6 text-center">
+                  <div className="w-16 h-16 mx-auto mb-4 bg-blue-100 rounded-full flex items-center justify-center">
+                    <BookOpen className="w-8 h-8 text-blue-600" />
+                  </div>
+                  <h3 className="text-lg font-semibold mb-2">Theory Test Practice</h3>
+                  <p className="text-gray-600 text-sm mb-4">Practice DVSA questions across 15 categories</p>
+                  <Button className="w-full" size="sm">Start Practice</Button>
+                </CardContent>
+              </Card>
 
-              {Object.values(instructorFilters).some(v => v !== '') && filteredInstructors.length > 0 && (
-                <div className="text-center mt-8">
-                  <Button variant="outline" size="lg">
-                    View All Matching Instructors
-                    <ArrowRight className="w-4 h-4 ml-2" />
-                  </Button>
-                </div>
-              )}
+              {/* Book Lessons */}
+              <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => window.location.href = '/dashboard'}>
+                <CardContent className="p-6 text-center">
+                  <div className="w-16 h-16 mx-auto mb-4 bg-green-100 rounded-full flex items-center justify-center">
+                    <Calendar className="w-8 h-8 text-green-600" />
+                  </div>
+                  <h3 className="text-lg font-semibold mb-2">My Dashboard</h3>
+                  <p className="text-gray-600 text-sm mb-4">View lessons, progress, and schedule</p>
+                  <Button className="w-full" variant="outline" size="sm">View Dashboard</Button>
+                </CardContent>
+              </Card>
+
+              {/* Messages */}
+              <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => window.location.href = '/messages'}>
+                <CardContent className="p-6 text-center">
+                  <div className="w-16 h-16 mx-auto mb-4 bg-purple-100 rounded-full flex items-center justify-center">
+                    <MessageCircle className="w-8 h-8 text-purple-600" />
+                  </div>
+                  <h3 className="text-lg font-semibold mb-2">Messages</h3>
+                  <p className="text-gray-600 text-sm mb-4">Chat with your instructor and support</p>
+                  <Button className="w-full" variant="outline" size="sm">View Messages</Button>
+                </CardContent>
+              </Card>
+
+              {/* Progress Tracking */}
+              <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => window.location.href = '/progress'}>
+                <CardContent className="p-6 text-center">
+                  <div className="w-16 h-16 mx-auto mb-4 bg-orange-100 rounded-full flex items-center justify-center">
+                    <CheckCircle className="w-8 h-8 text-orange-600" />
+                  </div>
+                  <h3 className="text-lg font-semibold mb-2">Progress</h3>
+                  <p className="text-gray-600 text-sm mb-4">Track your learning milestones</p>
+                  <Button className="w-full" variant="outline" size="sm">View Progress</Button>
+                </CardContent>
+              </Card>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
+
+      {/* Dynamic Instructors Section */}
+      <DynamicInstructorSection />
+
+      {/* Join Platform CTA */}
+      <JoinPlatformCTA />
 
       {/* Testimonials Section */}
       <section className="py-20">
@@ -342,7 +423,12 @@ export default function HomePage() {
             <Button 
               size="lg" 
               className="bg-gradient-to-r from-blue-600 to-green-600 hover:from-blue-700 hover:to-green-700 text-lg px-8 py-6"
-              onClick={() => document.getElementById('courses')?.scrollIntoView({ behavior: 'smooth' })}
+              onClick={() => {
+                const coursesSection = document.getElementById('courses');
+                if (coursesSection) {
+                  coursesSection.scrollIntoView({ behavior: 'smooth' });
+                }
+              }}
             >
               <Calendar className="w-5 h-5 mr-2" />
               Book Lessons
@@ -351,13 +437,11 @@ export default function HomePage() {
               size="lg" 
               className="bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700 text-white text-lg px-8 py-6 transform hover:scale-105 transition-all duration-200"
               onClick={() => {
-                const message = `Hi! I'd like a free consultation to discuss my driving learning needs and get personalized advice on the best course for me.`;
-                const encodedMessage = encodeURIComponent(message);
-                window.open(`https://wa.me/447756183484?text=${encodedMessage}`, '_blank');
+                window.location.href = '/theory';
               }}
             >
-              <MessageCircle className="w-5 h-5 mr-2" />
-              Free Consultation
+              <BookOpen className="w-5 h-5 mr-2" />
+              Test Your Skills
             </Button>
           </div>
         </div>
@@ -383,9 +467,27 @@ export default function HomePage() {
         onExitIntentShow={() => setShowWhatsAppOnExit(false)}
       />
 
+      <StudentAuthModal
+        isOpen={isStudentAuthModalOpen}
+        onClose={() => {
+          setIsStudentAuthModalOpen(false);
+          setPendingCourse(null);
+        }}
+        onSuccess={pendingCourse ? handleStudentAuthSuccess : handleBookLessonsSuccess}
+        courseName={pendingCourse?.course.title}
+      />
+
+      <CustomCourseModal
+        isOpen={isCustomCourseModalOpen}
+        onClose={() => setIsCustomCourseModalOpen(false)}
+        onBookCustomCourse={handleBookCustomCourse}
+      />
+
       <CoursePurchaseCounter />
       <ScrollToTop />
       
+      {/* Footer */}
+      <Footer />
 
     </main>
   );

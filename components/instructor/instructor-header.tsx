@@ -1,7 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { User } from '@/lib/db/schema';
+import { users } from '@/lib/db/schema';
+
+type User = typeof users.$inferSelect;
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -21,9 +23,25 @@ interface InstructorHeaderProps {
 export default function InstructorHeader({ user }: InstructorHeaderProps) {
   const [notifications] = useState(3); // Mock notification count
 
-  const handleSignOut = () => {
-    // Implement sign out logic
-    window.location.href = '/auth/signout';
+  const handleSignOut = async () => {
+    try {
+      const response = await fetch('/api/auth/logout', {
+        method: 'POST',
+      });
+
+      if (response.ok) {
+        // Successful logout - redirect to login page
+        window.location.href = '/login';
+      } else {
+        console.error('Logout failed');
+        // Still redirect even if API call fails (fallback)
+        window.location.href = '/login';
+      }
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Still redirect even if there's an error (fallback)
+      window.location.href = '/login';
+    }
   };
 
   return (
@@ -58,17 +76,17 @@ export default function InstructorHeader({ user }: InstructorHeaderProps) {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="flex items-center space-x-2 p-2">
                 <Avatar className="w-8 h-8">
-                  <AvatarImage src={user.avatar || undefined} alt={user.name || 'User'} />
+                  <AvatarImage src={user?.profilePicture || undefined} alt={`${user?.firstName || ''} ${user?.lastName || ''}`} />
                   <AvatarFallback className="bg-blue-600 text-white">
-                    {user.name?.charAt(0).toUpperCase() || 'U'}
+                    {user?.firstName?.charAt(0)?.toUpperCase() || user?.email?.charAt(0)?.toUpperCase() || 'U'}
                   </AvatarFallback>
                 </Avatar>
                 <div className="text-left hidden md:block">
                   <p className="text-sm font-medium text-gray-900 dark:text-white">
-                    {user.name}
+                    {user?.firstName || ''} {user?.lastName || ''}
                   </p>
                   <p className="text-xs text-gray-500 dark:text-gray-400 capitalize">
-                    {user.role}
+                    {user?.role || 'user'}
                   </p>
                 </div>
               </Button>
@@ -76,8 +94,8 @@ export default function InstructorHeader({ user }: InstructorHeaderProps) {
             <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuLabel>
                 <div className="flex flex-col space-y-1">
-                  <p className="text-sm font-medium">{user.name}</p>
-                  <p className="text-xs text-gray-500">{user.email}</p>
+                  <p className="text-sm font-medium">{user?.firstName || ''} {user?.lastName || ''}</p>
+                  <p className="text-xs text-gray-500">{user?.email || ''}</p>
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />

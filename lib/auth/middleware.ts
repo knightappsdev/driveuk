@@ -1,56 +1,106 @@
-import { z } from 'zod';
-import { User } from '@/lib/db/schema';
-import { getUser } from '@/lib/db/queries';
-import { redirect } from 'next/navigation';
+import { NextRequest, NextResponse } from 'next/server';
+import { getCurrentUser } from './auth-service';
 
-export type ActionState = {
-  error?: string;
-  success?: string;
-  [key: string]: any; // This allows for additional properties
-};
-
-type ValidatedActionFunction<S extends z.ZodType<any, any>, T> = (
-  data: z.infer<S>,
-  formData: FormData
-) => Promise<T>;
-
-export function validatedAction<S extends z.ZodType<any, any>, T>(
-  schema: S,
-  action: ValidatedActionFunction<S, T>
+/**
+ * Authentication middleware to protect routes
+ */
+export async function withAuth(
+  request: NextRequest, 
+  requiredRoles?: ('admin' | 'instructor' | 'student')[],
+  requireEmailVerification: boolean = true
 ) {
-  return async (prevState: ActionState, formData: FormData) => {
-    const result = schema.safeParse(Object.fromEntries(formData));
-    if (!result.success) {
-      return { error: result.error.errors[0].message };
-    }
+  try {
+    const user = await getCurrentUser();
 
-    return action(result.data, formData);
-  };
-}
-
-type ValidatedActionWithUserFunction<S extends z.ZodType<any, any>, T> = (
-  data: z.infer<S>,
-  formData: FormData,
-  user: User
-) => Promise<T>;
-
-export function validatedActionWithUser<S extends z.ZodType<any, any>, T>(
-  schema: S,
-  action: ValidatedActionWithUserFunction<S, T>
-) {
-  return async (prevState: ActionState, formData: FormData) => {
-    const user = await getUser();
+    // Check if user is authenticated
     if (!user) {
-      throw new Error('User is not authenticated');
+      return NextResponse.redirect(new URL('/login', request.url));
     }
 
-    const result = schema.safeParse(Object.fromEntries(formData));
-    if (!result.success) {
-      return { error: result.error.errors[0].message };
+    // Check email verification if required
+    if (requireEmailVerification && !user.isEmailVerified) {
+      return NextResponse.redirect(new URL('/verify-email', request.url));
     }
 
-    return action(result.data, formData, user);
-  };
+    // Check role authorization if specified
+    if (requiredRoles && !requiredRoles.includes(user.role)) {
+      return NextResponse.redirect(new URL('/unauthorized', request.url));
+    }
+
+    return NextResponse.next();
+
+  } catch (error) {
+    console.error('Auth middleware error:', error);
+    return NextResponse.redirect(new URL('/login', request.url));
+  }
 }
 
+/**
+ * Middleware to redirect authenticated users away from auth pages
+ */
+export async function withGuest(request: NextRequest) {
+  try {
+    const user = await getCurrentUser();
 
+    if (user) {
+      // Redirect based on user role and email verification
+      let redirectPath = '/dashboard';
+      
+      if (!user.isEmailVerified) {
+        redirectPath = '/verify-email';
+      } else {
+        switch (user.role) {
+          case 'admin':
+            redirectPath = '/admin';
+            break;
+          case 'instructor':
+            redirectPath = '/instructor';
+            break;
+          case 'student':
+            redirectPath = '/dashboard';
+            break;
+          default:
+            redirectPath = '/dashboard';
+        }
+      }
+
+      return NextResponse.redirect(new URL(redirectPath, request.url));
+    }
+
+    return NextResponse.next();
+
+  } catch (error) {
+    console.error('Guest middleware error:', error);
+    return NextResponse.next();
+  }
+}
+
+/**
+ * Get client IP address from request
+ */
+export function getClientIP(request: NextRequest): string {
+  const forwarded = request.headers.get('x-forwarded-for');
+  const realIP = request.headers.get('x-real-ip');
+  const cfConnectingIp = request.headers.get('cf-connecting-ip');
+  
+  if (forwarded) {
+    return forwarded.split(',')[0].trim();
+  }
+  
+  if (realIP) {
+    return realIP;
+  }
+  
+  if (cfConnectingIp) {
+    return cfConnectingIp;
+  }
+  
+  return 'unknown';
+}
+
+/**
+ * Get user agent from request
+ */
+export function getUserAgent(request: NextRequest): string {
+  return request.headers.get('user-agent') || 'unknown';
+}

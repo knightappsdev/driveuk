@@ -20,7 +20,11 @@ export interface Instructor {
   nationality: string;
   religion: string;
   ethnicity: string;
-  gender: 'Male' | 'Female' | 'Non-binary';
+  gender: 'Male' | 'Female' | 'Non-binary' | string;
+  phone?: string;
+  whatsappNumber?: string;
+  email?: string;
+  postcode?: string;
 }
 
 interface InstructorCardProps {

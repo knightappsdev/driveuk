@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Run Migration</title>
+    <script>
+        async function runMigration() {
+            try {
+                const response = await fetch('/api/admin/migrate-instructor-approval', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const result = await response.json();
+                document.getElementById('result').innerHTML = JSON.stringify(result, null, 2);
+            } catch (error) {
+                document.getElementById('result').innerHTML = 'Error: ' + error.message;
+            }
+        }
+    </script>
+</head>
+<body>
+    <h1>Database Migration</h1>
+    <button onclick="runMigration()">Run Instructor Approval Migration</button>
+    <pre id="result"></pre>
+</body>
+</html>

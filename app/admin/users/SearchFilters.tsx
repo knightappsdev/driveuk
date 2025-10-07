@@ -1,0 +1,63 @@
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Search } from 'lucide-react';
+
+interface SearchFiltersProps {
+  searchTerm: string;
+  onSearchChange: (value: string) => void;
+  selectedRole: string;
+  onRoleChange: (value: string) => void;
+  selectedStatus: string;
+  onStatusChange: (value: string) => void;
+}
+
+export default function SearchFilters({ 
+  searchTerm, 
+  onSearchChange, 
+  selectedRole,
+  onRoleChange,
+  selectedStatus, 
+  onStatusChange 
+}: SearchFiltersProps) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-lg">Filters & Search</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="flex flex-col sm:flex-row gap-4">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+            <Input
+              placeholder="Search users..."
+              value={searchTerm}
+              onChange={(e) => onSearchChange(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+
+          <select
+            value={selectedRole}
+            onChange={(e) => onRoleChange(e.target.value)}
+            className="px-3 py-2 border border-gray-300 rounded-md bg-white dark:bg-gray-800 dark:border-gray-600"
+          >
+            <option value="all">All Roles</option>
+            <option value="admin">Admin</option>
+            <option value="instructor">Instructor</option>
+            <option value="student">Student</option>
+          </select>
+
+          <select
+            value={selectedStatus}
+            onChange={(e) => onStatusChange(e.target.value)}
+            className="px-3 py-2 border border-gray-300 rounded-md bg-white dark:bg-gray-800 dark:border-gray-600"
+          >
+            <option value="all">All Status</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}

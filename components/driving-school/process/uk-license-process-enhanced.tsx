@@ -46,13 +46,13 @@ export default function UKLicenseProcessEnhanced() {
   const [isVisible, setIsVisible] = useState(false);
   const sectionRef = useRef<HTMLDivElement>(null);
   
-  // Auto-progress through steps
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentStep(prev => prev < 6 ? prev + 1 : 1);
-    }, 4000);
-    return () => clearInterval(timer);
-  }, []);
+  // Auto-progress through steps - DISABLED
+  // useEffect(() => {
+  //   const timer = setInterval(() => {
+  //     setCurrentStep(prev => prev < 6 ? prev + 1 : 1);
+  //   }, 4000);
+  //   return () => clearInterval(timer);
+  // }, []);
   
   // Initial animation trigger
   useEffect(() => {
@@ -463,44 +463,7 @@ export default function UKLicenseProcessEnhanced() {
           })}
         </div>
 
-        {/* Enhanced Call to Action */}
-        <div className={`text-center mt-16 transition-all duration-1000 delay-1000 ${isVisible ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'}`}>
-          <div className="bg-gradient-to-br from-white via-blue-50/30 to-green-50/30 rounded-2xl shadow-2xl p-8 max-w-4xl mx-auto border border-blue-200/50 backdrop-blur-sm">
-            <div className="flex items-center justify-center gap-2 mb-4">
-              <Users className="w-6 h-6 text-blue-600" />
-              <h3 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent">
-                Ready to Start Your Driving Journey?
-              </h3>
-            </div>
-            <p className="text-gray-600 mb-6 text-lg leading-relaxed">
-              Our expert instructors will guide you through every step. Get personalized support and increase your chances of passing first time!
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button 
-                size="lg"
-                className="group bg-gradient-to-r from-blue-600 via-purple-600 to-green-600 hover:from-blue-700 hover:via-purple-700 hover:to-green-700 text-white px-8 py-6 text-lg shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-105"
-                onClick={() => document.getElementById('courses')?.scrollIntoView({ behavior: 'smooth' })}
-              >
-                <Car className="w-5 h-5 mr-2 group-hover:scale-110 transition-transform" />
-                Book Your First Lesson
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent transform -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
-              </Button>
-              <Button 
-                size="lg"
-                variant="outline"
-                className="group border-2 border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white px-8 py-6 text-lg shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
-                onClick={() => {
-                  const message = `Hi! I'd like to know more about the UK driving license process and how you can help me get licensed.`;
-                  const encodedMessage = encodeURIComponent(message);
-                  window.open(`https://wa.me/447756183484?text=${encodedMessage}`, '_blank');
-                }}
-              >
-                <Phone className="w-5 h-5 mr-2 group-hover:scale-110 transition-transform" />
-                Get Free Consultation
-              </Button>
-            </div>
-          </div>
-        </div>
+
       </div>
 
       {/* Enhanced CSS Animations */}

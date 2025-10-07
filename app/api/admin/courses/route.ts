@@ -1,155 +1,97 @@
-import { NextRequest, NextResponse } from 'next/server';
+﻿import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db/drizzle';
-import { courses, bookings, students, users, type NewCourse } from '@/lib/db/schema';
+import { courses } from '@/lib/db/schema';
 import { validateApiAccess } from '@/lib/auth/auth-helpers';
-import { desc, eq, count, and, isNull } from 'drizzle-orm';
-import { z } from 'zod';
 
-// Validation schemas
-const createCourseSchema = z.object({
-  title: z.string().min(1, 'Title is required').max(100),
-  description: z.string().min(1, 'Description is required'),
-  level: z.enum(['absolute-beginner', 'beginner', 'intermediate', 'advanced']),
-  totalHours: z.number().min(1, 'Total hours must be positive').max(200),
-  price: z.number().min(1, 'Price must be positive'),
-  features: z.array(z.string()).min(1, 'At least one feature required'),
-  color: z.string().default('blue'),
-  isRecommended: z.boolean().default(false),
-  isActive: z.boolean().default(true),
-});
-
-const updateCourseSchema = z.object({
-  title: z.string().min(1).max(100).optional(),
-  description: z.string().min(1).optional(),
-  level: z.enum(['absolute-beginner', 'beginner', 'intermediate', 'advanced']).optional(),
-  totalHours: z.number().min(1).max(200).optional(),
-  price: z.number().min(1).optional(),
-  features: z.array(z.string()).optional(),
-  color: z.string().optional(),
-  isRecommended: z.boolean().optional(),
-  isActive: z.boolean().optional(),
-});
-
-// GET: Fetch all courses
 export async function GET() {
   try {
-    const user = await validateApiAccess('admin');
-    
-    if (!user) {
+    const accessResult = await validateApiAccess();
+
+    if (!accessResult.success) {
       return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
+        { success: false, error: accessResult.error },
+        { status: accessResult.status }
       );
     }
 
-    // Fetch all courses with student counts
-    const coursesWithCounts = await db
-      .select({
-        id: courses.id,
-        title: courses.title,
-        description: courses.description,
-        level: courses.level,
-        totalHours: courses.totalHours,
-        price: courses.price,
-        features: courses.features,
-        color: courses.color,
-        isRecommended: courses.isRecommended,
-        isActive: courses.isActive,
-        createdAt: courses.createdAt,
-        updatedAt: courses.updatedAt,
-        studentCount: count(bookings.id),
-      })
+    const coursesData = await db
+      .select()
       .from(courses)
-      .leftJoin(bookings, eq(courses.id, bookings.courseId))
-      .leftJoin(students, eq(bookings.studentId, students.id))
-      .leftJoin(users, eq(students.userId, users.id))
-      .where(and(
-        isNull(users.deletedAt)
-      ))
-      .groupBy(courses.id)
-      .orderBy(desc(courses.createdAt));
+      .orderBy(courses.title);
 
-    return NextResponse.json(coursesWithCounts);
+    // Map database fields to interface fields
+    const mappedCourses = coursesData.map(course => ({
+      ...course,
+      totalHours: Math.round(course.duration / 60), // Convert minutes to hours
+      studentCount: course.enrolledStudents || 0,
+      features: [], // Default empty array since this field doesn't exist in DB
+      color: '#3B82F6', // Default color
+      isRecommended: course.isRecommended || false, // Use actual database value
+      price: course.price.toString(), // Convert decimal to string
+    }));
 
+    return NextResponse.json({
+      success: true,
+      data: mappedCourses,
+    });
   } catch (error) {
-    console.error('Admin courses fetch error:', error);
+    console.error('Error fetching courses:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch courses' },
+      { success: false, error: 'Failed to fetch courses' },
       { status: 500 }
     );
   }
 }
 
-// POST: Create new course
 export async function POST(request: NextRequest) {
   try {
-    const user = await validateApiAccess('admin');
-    
-    if (!user) {
+    const accessResult = await validateApiAccess();
+
+    if (!accessResult.success) {
       return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
+        { success: false, error: accessResult.error },
+        { status: accessResult.status }
       );
     }
 
     const body = await request.json();
-    const validatedData = createCourseSchema.parse(body);
+    console.log('Creating new course with data:', body);
 
-    // Check if course title already exists
-    const existingCourse = await db
-      .select({ id: courses.id })
-      .from(courses)
-      .where(eq(courses.title, validatedData.title))
-      .limit(1);
-
-    if (existingCourse.length > 0) {
+    // Validate required fields
+    if (!body.title || !body.description || !body.level) {
       return NextResponse.json(
-        { error: 'Course title already exists' },
+        { success: false, error: 'Missing required fields: title, description, level' },
         { status: 400 }
       );
     }
 
-    // Create new course
-    const newCourse: NewCourse = {
-      title: validatedData.title,
-      description: validatedData.description,
-      level: validatedData.level,
-      totalHours: validatedData.totalHours,
-      price: validatedData.price.toString(),
-      features: validatedData.features,
-      color: validatedData.color,
-      isRecommended: validatedData.isRecommended,
-      isActive: validatedData.isActive,
-    };
-
-    const [createdCourse] = await db
+    // Create course record
+    const newCourse = await db
       .insert(courses)
-      .values(newCourse)
+      .values({
+        title: body.title,
+        description: body.description || null,
+        level: body.level,
+        duration: body.duration || 60,
+        price: body.price ? body.price.toString() : '0.00',
+        maxStudents: body.maxStudents || 1,
+        enrolledStudents: body.enrolledStudents || 0,
+        transmissionType: body.transmissionType || 'manual',
+        isActive: body.isActive !== undefined ? body.isActive : true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
       .returning();
 
-    return NextResponse.json(
-      { 
-        message: 'Course created successfully',
-        course: createdCourse 
-      },
-      { status: 201 }
-    );
-
+    return NextResponse.json({
+      success: true,
+      message: 'Course created successfully',
+      data: newCourse[0],
+    });
   } catch (error) {
-    console.error('Course creation error:', error);
-    
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { 
-          error: 'Validation failed',
-          details: error.errors 
-        },
-        { status: 400 }
-      );
-    }
-
+    console.error('Error creating course:', error);
     return NextResponse.json(
-      { error: 'Failed to create course' },
+      { success: false, error: 'Failed to create course' },
       { status: 500 }
     );
   }
